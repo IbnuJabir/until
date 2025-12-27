@@ -12,7 +12,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  Switch,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useReminderStore } from '@/app/src/store/reminderStore';
@@ -20,7 +21,6 @@ import {
   TriggerType,
   createReminder,
   createTrigger,
-  FREE_TIER_LIMITS,
 } from '@/app/src/domain';
 
 export default function CreateReminderScreen() {
@@ -122,127 +122,145 @@ export default function CreateReminderScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.cancelButton}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Reminder</Text>
-        <TouchableOpacity onPress={handleCreate} disabled={isCreating}>
-          <Text style={[styles.saveButton, isCreating && styles.saveButtonDisabled]}>
-            {isCreating ? 'Creating...' : 'Create'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content}>
-        {/* Title Input */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>What do you want to remember?</Text>
-          <TextInput
-            style={styles.titleInput}
-            placeholder="e.g., Call mom, Buy groceries"
-            value={title}
-            onChangeText={setTitle}
-            autoFocus
-            returnKeyType="next"
-          />
+    <View style={styles.modalContainer}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <View style={styles.handleBar}>
+          <View style={styles.handle} />
         </View>
 
-        {/* Description (Optional) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>
-            Notes <Text style={styles.optional}>(optional)</Text>
-          </Text>
-          <TextInput
-            style={styles.descriptionInput}
-            placeholder="Add any details..."
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-        </View>
-
-        {/* Triggers */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>When should we remind you?</Text>
-          <Text style={styles.sectionHint}>
-            Select one or more triggers. All must be true to fire the reminder.
-          </Text>
-
-          {triggerOptions.map((option) => {
-            const isSelected = selectedTriggers.includes(option.type);
-            const isLocked = option.isPro && !isPro;
-
-            return (
-              <TouchableOpacity
-                key={option.type}
-                style={[
-                  styles.triggerOption,
-                  isSelected && styles.triggerOptionSelected,
-                  isLocked && styles.triggerOptionLocked,
-                ]}
-                onPress={() => toggleTrigger(option.type, option.isPro)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.triggerLeft}>
-                  <Text style={styles.triggerIcon}>{option.icon}</Text>
-                  <View style={styles.triggerTextContainer}>
-                    <Text style={styles.triggerLabel}>{option.label}</Text>
-                    {isLocked && (
-                      <Text style={styles.proLabel}>Pro Feature</Text>
-                    )}
-                  </View>
-                </View>
-                <View style={styles.triggerRight}>
-                  {isLocked && <Text style={styles.lockIcon}>🔒</Text>}
-                  {!isLocked && (
-                    <View
-                      style={[
-                        styles.checkbox,
-                        isSelected && styles.checkboxSelected,
-                      ]}
-                    >
-                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Pro Upsell */}
-        {!isPro && (
-          <TouchableOpacity
-            style={styles.proUpsell}
-            onPress={() => router.push('/paywall' as any)}
-          >
-            <Text style={styles.proUpsellTitle}>✨ Unlock All Triggers</Text>
-            <Text style={styles.proUpsellText}>
-              Get location-based, charging, and app-opened reminders with Until Pro
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={styles.cancelButton}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>New Reminder</Text>
+          <TouchableOpacity onPress={handleCreate} disabled={isCreating}>
+            <Text style={[styles.saveButton, isCreating && styles.saveButtonDisabled]}>
+              {isCreating ? 'Creating...' : 'Create'}
             </Text>
           </TouchableOpacity>
-        )}
-      </ScrollView>
+        </View>
+
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>What do you want to remember?</Text>
+                <TextInput
+                  style={styles.titleInput}
+                  placeholder="e.g., Call mom, Buy groceries"
+                  value={title}
+                  onChangeText={setTitle}
+                  returnKeyType="next"
+                />
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>
+                  Notes <Text style={styles.optional}>(optional)</Text>
+                </Text>
+                <TextInput
+                  style={styles.descriptionInput}
+                  placeholder="Add any details..."
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>When should we remind you?</Text>
+                <Text style={styles.sectionHint}>
+                  Select one or more triggers. All must be true to fire the reminder.
+                </Text>
+
+                {triggerOptions.map((option) => {
+                  const isSelected = selectedTriggers.includes(option.type);
+                  const isLocked = option.isPro && !isPro;
+
+                  return (
+                    <TouchableOpacity
+                      key={option.type}
+                      style={[
+                        styles.triggerOption,
+                        isSelected && styles.triggerOptionSelected,
+                        isLocked && styles.triggerOptionLocked,
+                      ]}
+                      onPress={() => toggleTrigger(option.type, option.isPro)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.triggerLeft}>
+                        <Text style={styles.triggerIcon}>{option.icon}</Text>
+                        <View style={styles.triggerTextContainer}>
+                          <Text style={styles.triggerLabel}>{option.label}</Text>
+                          {isLocked && (
+                            <Text style={styles.proLabel}>Pro Feature</Text>
+                          )}
+                        </View>
+                      </View>
+                      <View style={styles.triggerRight}>
+                        {isLocked && <Text style={styles.lockIcon}>🔒</Text>}
+                        {!isLocked && (
+                          <View
+                            style={[
+                              styles.checkbox,
+                              isSelected && styles.checkboxSelected,
+                            ]}
+                          >
+                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {!isPro && (
+                <TouchableOpacity
+                  style={styles.proUpsell}
+                  onPress={() => router.push('/paywall' as any)}
+                >
+                  <Text style={styles.proUpsellTitle}>✨ Unlock All Triggers</Text>
+                  <Text style={styles.proUpsellText}>
+                    Get location-based, charging, and app-opened reminders with Until Pro
+                  </Text>
+                </TouchableOpacity>
+              )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+  },
+  handleBar: {
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  handle: {
+    width: 36,
+    height: 5,
+    backgroundColor: '#D1D1D6',
+    borderRadius: 3,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 60,
+    paddingTop: 12,
     paddingBottom: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
