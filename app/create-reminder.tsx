@@ -3,65 +3,76 @@
  * Simple, sentence-based reminder creation per CONTEXT.md Phase 12
  */
 
-import { useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useReminderStore } from '@/app/src/store/reminderStore';
 import {
   TriggerType,
   createReminder,
   createTrigger,
 } from '@/app/src/domain';
+import { useReminderStore } from '@/app/src/store/reminderStore';
+import { useScreenTime } from '@/app/src/hooks/useScreenTime';
+import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+} from 'react-native';
 
 export default function CreateReminderScreen() {
   const router = useRouter();
   const { addReminder, entitlements } = useReminderStore();
+  const screenTime = useScreenTime();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedTriggers, setSelectedTriggers] = useState<TriggerType[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedAppCount, setSelectedAppCount] = useState<number>(0);
 
   const isPro = entitlements.hasProAccess;
+
+  // Check if user has selected apps when component mounts
+  useEffect(() => {
+    if (screenTime.hasAppsSelected) {
+      console.log('[CreateReminder] User has previously selected apps');
+    }
+  }, [screenTime.hasAppsSelected]);
 
   const triggerOptions = [
     {
       type: TriggerType.PHONE_UNLOCK,
       label: 'When I unlock my phone',
       icon: '📱',
-      isPro: false,
+      isPro: false, // Free for testing
     },
     {
       type: TriggerType.CHARGING_STARTED,
       label: 'When I start charging',
       icon: '🔌',
-      isPro: true,
+      isPro: false, // TEMP: Disabled for testing (was: true)
     },
     {
       type: TriggerType.LOCATION_ENTER,
       label: 'When I arrive somewhere',
       icon: '📍',
-      isPro: true,
+      isPro: false, // TEMP: Disabled for testing (was: true)
     },
     {
       type: TriggerType.APP_OPENED,
       label: 'When I open an app',
       icon: '📲',
-      isPro: true,
+      isPro: false, // TEMP: Disabled for testing (was: true)
     },
   ];
 
-  const toggleTrigger = (triggerType: TriggerType, requiresPro: boolean) => {
+  const toggleTrigger = async (triggerType: TriggerType, requiresPro: boolean) => {
     if (requiresPro && !isPro) {
       Alert.alert(
         'Pro Feature',
@@ -74,11 +85,73 @@ export default function CreateReminderScreen() {
       return;
     }
 
+    // If selecting "When I open an app", handle Screen Time flow
+    if (triggerType === TriggerType.APP_OPENED) {
+      if (!selectedTriggers.includes(triggerType)) {
+        await handleAppTriggerSelection();
+      } else {
+        // Deselecting - remove trigger and clear selected apps
+        setSelectedTriggers((prev) => prev.filter((t) => t !== triggerType));
+        setSelectedAppCount(0);
+        await screenTime.clearApps();
+      }
+      return;
+    }
+
     setSelectedTriggers((prev) =>
       prev.includes(triggerType)
         ? prev.filter((t) => t !== triggerType)
         : [...prev, triggerType]
     );
+  };
+
+  const handleAppTriggerSelection = async () => {
+    // Step 1: Check if already authorized
+    if (!screenTime.isAuthorized) {
+      // Request permission first
+      Alert.alert(
+        'Screen Time Permission Required',
+        'Until needs Screen Time permission to detect when you open specific apps. You will choose which apps to monitor.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Continue',
+            onPress: async () => {
+              await screenTime.requestPermission();
+
+              // After permission, check if authorized and continue
+              if (screenTime.isAuthorized) {
+                await showAppPickerFlow();
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // Step 2: Show app picker
+    await showAppPickerFlow();
+  };
+
+  const showAppPickerFlow = async () => {
+    try {
+      const result = await screenTime.showAppPicker();
+
+      if (result && result.selectedCount > 0) {
+        // User selected apps successfully
+        setSelectedAppCount(result.selectedCount);
+        setSelectedTriggers((prev) => [...prev, TriggerType.APP_OPENED]);
+
+        Alert.alert(
+          'Apps Selected',
+          `You selected ${result.selectedCount} app${result.selectedCount > 1 ? 's' : ''}. This reminder will trigger when you open any of them.`
+        );
+      }
+    } catch (error) {
+      console.error('[CreateReminder] Failed to show app picker:', error);
+      Alert.alert('Error', 'Failed to show app picker. Please try again.');
+    }
   };
 
   const handleCreate = async () => {
@@ -93,11 +166,27 @@ export default function CreateReminderScreen() {
       return;
     }
 
+    // Validate app selection if APP_OPENED trigger is selected
+    if (selectedTriggers.includes(TriggerType.APP_OPENED) && selectedAppCount === 0) {
+      Alert.alert('Error', 'Please select apps to monitor for the app trigger');
+      return;
+    }
+
     setIsCreating(true);
 
     try {
-      // Create triggers
-      const triggers = selectedTriggers.map((type) => createTrigger(type));
+      // Create triggers with config for APP_OPENED
+      const triggers = selectedTriggers.map((type) => {
+        if (type === TriggerType.APP_OPENED) {
+          // Screen Time API uses tokenized app identifiers (not bundle IDs)
+          // Store a placeholder config - actual monitoring happens via native module
+          return createTrigger(type, {
+            bundleId: 'screentime.apps.selected',
+            appName: `${selectedAppCount} selected app${selectedAppCount > 1 ? 's' : ''}`,
+          });
+        }
+        return createTrigger(type);
+      });
 
       // Create reminder
       const reminder = createReminder(title.trim(), triggers, [], description.trim());
@@ -179,6 +268,8 @@ export default function CreateReminderScreen() {
                 {triggerOptions.map((option) => {
                   const isSelected = selectedTriggers.includes(option.type);
                   const isLocked = option.isPro && !isPro;
+                  const isAppTrigger = option.type === TriggerType.APP_OPENED;
+                  const showAppCount = isAppTrigger && isSelected && selectedAppCount > 0;
 
                   return (
                     <TouchableOpacity
@@ -190,19 +281,28 @@ export default function CreateReminderScreen() {
                       ]}
                       onPress={() => toggleTrigger(option.type, option.isPro)}
                       activeOpacity={0.7}
+                      disabled={screenTime.isLoading}
                     >
                       <View style={styles.triggerLeft}>
                         <Text style={styles.triggerIcon}>{option.icon}</Text>
                         <View style={styles.triggerTextContainer}>
                           <Text style={styles.triggerLabel}>{option.label}</Text>
+                          {showAppCount && (
+                            <Text style={styles.selectedAppLabel}>
+                              {selectedAppCount} app{selectedAppCount > 1 ? 's' : ''} selected
+                            </Text>
+                          )}
                           {isLocked && (
                             <Text style={styles.proLabel}>Pro Feature</Text>
                           )}
                         </View>
                       </View>
                       <View style={styles.triggerRight}>
-                        {isLocked && <Text style={styles.lockIcon}>🔒</Text>}
-                        {!isLocked && (
+                        {screenTime.isLoading && isAppTrigger ? (
+                          <ActivityIndicator size="small" />
+                        ) : isLocked ? (
+                          <Text style={styles.lockIcon}>🔒</Text>
+                        ) : (
                           <View
                             style={[
                               styles.checkbox,
@@ -218,7 +318,8 @@ export default function CreateReminderScreen() {
                 })}
               </View>
 
-              {!isPro && (
+              {/* TEMP: Pro upsell disabled for testing */}
+              {/* {!isPro && (
                 <TouchableOpacity
                   style={styles.proUpsell}
                   onPress={() => router.push('/paywall' as any)}
@@ -228,7 +329,7 @@ export default function CreateReminderScreen() {
                     Get location-based, charging, and app-opened reminders with Until Pro
                   </Text>
                 </TouchableOpacity>
-              )}
+              )} */}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -363,6 +464,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
+  selectedAppLabel: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '600',
+    marginTop: 2,
+  },
   triggerRight: {
     marginLeft: 12,
   },
@@ -404,5 +511,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
     opacity: 0.9,
+  },
+  // App Picker Modal Styles
+  appPickerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  appPickerBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  appPickerModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    width: '85%',
+    maxHeight: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  appPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  appPickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  appPickerClose: {
+    fontSize: 24,
+    color: '#999',
+    fontWeight: '300',
+  },
+  appPickerList: {
+    maxHeight: 400,
+  },
+  appPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  appPickerItemIcon: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  appPickerItemName: {
+    fontSize: 16,
+    color: '#000',
+    fontWeight: '500',
   },
 });

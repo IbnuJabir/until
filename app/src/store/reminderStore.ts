@@ -200,6 +200,10 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
   handleEvent: async (event: SystemEvent) => {
     const { reminders, systemState } = get();
 
+    console.log('[Store] handleEvent called');
+    console.log('[Store] Event:', event.type);
+    console.log('[Store] Reminders in store:', reminders.length);
+
     // Fire notification handler
     const fireNotification = async (reminder: Reminder) => {
       const { fireNotification: fireNotificationService } = await import(
@@ -207,17 +211,20 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       );
 
       try {
+        console.log(`[Store] Calling notification service for: ${reminder.title}`);
         await fireNotificationService(reminder);
-        console.log(`[RuleEngine] Fired notification for: ${reminder.title}`);
+        console.log(`[Store] ✅ Notification fired successfully for: ${reminder.title}`);
       } catch (error) {
-        console.error(`[RuleEngine] Failed to fire notification:`, error);
+        console.error(`[Store] ❌ Failed to fire notification:`, error);
         throw error;
       }
     };
 
     // State update handler
     const updateReminderState = async (reminder: Reminder) => {
+      console.log(`[Store] Updating reminder state for: ${reminder.title}`);
       await get().updateReminder(reminder.id, reminder);
+      console.log(`[Store] ✅ Reminder state updated`);
     };
 
     // Execute rule engine
@@ -266,16 +273,20 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
    * Check if user can add more reminders (free tier limit)
    */
   canAddMoreReminders: () => {
-    const { reminders, entitlements } = get();
+    // TEMP: Disabled for testing - allow unlimited reminders
+    return true;
 
-    // Pro users have unlimited reminders
-    if (entitlements.hasProAccess) {
-      return true;
-    }
-
-    // Free users limited to 3 active reminders
-    const activeReminders = reminders.filter(isReminderActive);
-    return activeReminders.length < 3;
+    // ORIGINAL CODE (commented out for testing):
+    // const { reminders, entitlements } = get();
+    //
+    // // Pro users have unlimited reminders
+    // if (entitlements.hasProAccess) {
+    //   return true;
+    // }
+    //
+    // // Free users limited to 3 active reminders
+    // const activeReminders = reminders.filter(isReminderActive);
+    // return activeReminders.length < 3;
   },
 
   /**

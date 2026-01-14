@@ -249,16 +249,41 @@ export function evaluateRules(
     currentLocation?: { latitude: number; longitude: number };
   }
 ): RuleEvaluationResult {
+  console.log('[RuleEngine] ========== Evaluating Rules ==========');
+  console.log('[RuleEngine] Event type:', event.type);
+  console.log('[RuleEngine] Total reminders:', allReminders.length);
+  console.log('[RuleEngine] Reminders by status:', {
+    waiting: allReminders.filter(r => r.status === ReminderStatus.WAITING).length,
+    fired: allReminders.filter(r => r.status === ReminderStatus.FIRED).length,
+  });
+
   // Step 1: Filter reminders listening to this event
   const listeningReminders = getRemindersListeningTo(allReminders, event);
+  console.log('[RuleEngine] Reminders listening to this event:', listeningReminders.length);
+
+  if (listeningReminders.length > 0) {
+    listeningReminders.forEach(r => {
+      console.log(`[RuleEngine] - "${r.title}" (${r.triggers.length} triggers, ${r.conditions.length} conditions)`);
+    });
+  }
 
   // Step 2: Build evaluation context
   const context = buildEvaluationContext(event, currentState);
+  console.log('[RuleEngine] Evaluation context:', {
+    time: context.currentTime.toISOString(),
+    isCharging: context.isCharging,
+    hasLocation: !!context.currentLocation,
+  });
 
   // Step 3: Evaluate conditions for each reminder
-  const remindersToFire = listeningReminders.filter((reminder) =>
-    evaluateAllConditions(reminder, context)
-  );
+  const remindersToFire = listeningReminders.filter((reminder) => {
+    const shouldFire = evaluateAllConditions(reminder, context);
+    console.log(`[RuleEngine] "${reminder.title}" - Should fire: ${shouldFire}`);
+    return shouldFire;
+  });
+
+  console.log('[RuleEngine] Reminders to fire:', remindersToFire.length);
+  console.log('[RuleEngine] ========================================');
 
   return {
     remindersToFire,
@@ -291,12 +316,16 @@ export async function handleSystemEvent(
   fireNotification: NotificationHandler,
   updateReminderState: StateUpdateHandler
 ): Promise<void> {
+  console.log('[RuleEngine] handleSystemEvent called');
+
   // Evaluate rules
   const { remindersToFire } = evaluateRules(allReminders, event, currentState);
 
   // Fire notifications and update state
   for (const reminder of remindersToFire) {
     try {
+      console.log(`[RuleEngine] Firing notification for: ${reminder.title}`);
+
       // Fire notification
       await fireNotification(reminder);
 
@@ -307,9 +336,11 @@ export async function handleSystemEvent(
         firedAt: Date.now(),
       };
 
+      console.log(`[RuleEngine] Updating reminder state to FIRED`);
       await updateReminderState(firedReminder);
+      console.log(`[RuleEngine] ✅ Successfully fired and updated: ${reminder.title}`);
     } catch (error) {
-      console.error(`Failed to fire reminder ${reminder.id}:`, error);
+      console.error(`[RuleEngine] ❌ Failed to fire reminder ${reminder.id}:`, error);
     }
   }
 }

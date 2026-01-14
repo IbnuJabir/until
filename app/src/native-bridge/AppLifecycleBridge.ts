@@ -5,10 +5,15 @@
 import { NativeEventEmitter, NativeModules } from 'react-native';
 import { SystemEvent, SystemEventType } from '../domain';
 
+console.log('[AppLifecycleBridge] Available native modules:', Object.keys(NativeModules));
+
 const { AppLifecycleModule } = NativeModules;
 
 if (!AppLifecycleModule) {
-  console.warn('[AppLifecycleBridge] Native module not found. Make sure iOS project is built.');
+  console.error('[AppLifecycleBridge] ❌ AppLifecycleModule not found!');
+  console.error('[AppLifecycleBridge] Available modules:', Object.keys(NativeModules).join(', '));
+} else {
+  console.log('[AppLifecycleBridge] ✅ AppLifecycleModule loaded successfully');
 }
 
 const appLifecycleEmitter = AppLifecycleModule
