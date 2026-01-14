@@ -9,6 +9,7 @@ import {
   ReminderStatus,
   PaymentEntitlement,
   SystemEvent,
+  SavedPlace,
   createReminder,
   markReminderAsFired,
   isReminderActive,
@@ -35,6 +36,9 @@ interface ReminderStore {
   reminders: Reminder[];
   systemState: SystemState;
 
+  // Saved places
+  savedPlaces: SavedPlace[];
+
   // Payment entitlements
   entitlements: PaymentEntitlement;
 
@@ -48,6 +52,13 @@ interface ReminderStore {
   updateReminderStatus: (id: string, status: ReminderStatus) => Promise<void>;
   deleteReminder: (id: string) => Promise<void>;
   fireReminder: (id: string) => Promise<void>;
+
+  // Saved place actions
+  addSavedPlace: (place: SavedPlace) => Promise<void>;
+  updateSavedPlace: (id: string, updates: Partial<SavedPlace>) => Promise<void>;
+  deleteSavedPlace: (id: string) => Promise<void>;
+  getSavedPlaceById: (id: string) => SavedPlace | undefined;
+  incrementPlaceUsage: (id: string) => Promise<void>;
 
   // System event handler
   handleEvent: (event: SystemEvent) => Promise<void>;
@@ -91,6 +102,7 @@ const defaultEntitlements: PaymentEntitlement = {
 export const useReminderStore = create<ReminderStore>((set, get) => ({
   // Initial state
   reminders: [],
+  savedPlaces: [],
   systemState: defaultSystemState,
   entitlements: defaultEntitlements,
   isLoading: false,
@@ -322,6 +334,142 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
   },
 
   /**
+   * Add a new saved place
+   */
+  addSavedPlace: async (place: SavedPlace) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const { saveSavedPlace } = await import('../storage/database');
+
+      const currentPlaces = get().savedPlaces;
+
+      // Save to database
+      await saveSavedPlace(place);
+
+      set({
+        savedPlaces: [...currentPlaces, place],
+        isLoading: false,
+      });
+
+      console.log(`[Store] Added saved place: ${place.name}`);
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to add saved place',
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Update an existing saved place
+   */
+  updateSavedPlace: async (id: string, updates: Partial<SavedPlace>) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const { updateSavedPlace: dbUpdateSavedPlace } = await import(
+        '../storage/database'
+      );
+
+      const currentPlaces = get().savedPlaces;
+      const updatedPlaces = currentPlaces.map((place) =>
+        place.id === id ? { ...place, ...updates } : place
+      );
+
+      // Update in database
+      await dbUpdateSavedPlace(id, updates);
+
+      set({
+        savedPlaces: updatedPlaces,
+        isLoading: false,
+      });
+
+      console.log(`[Store] Updated saved place: ${id}`);
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to update saved place',
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a saved place
+   */
+  deleteSavedPlace: async (id: string) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const { deleteSavedPlace: dbDeleteSavedPlace } = await import(
+        '../storage/database'
+      );
+
+      const currentPlaces = get().savedPlaces;
+      const filteredPlaces = currentPlaces.filter((p) => p.id !== id);
+
+      // Delete from database
+      await dbDeleteSavedPlace(id);
+
+      set({
+        savedPlaces: filteredPlaces,
+        isLoading: false,
+      });
+
+      console.log(`[Store] Deleted saved place: ${id}`);
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to delete saved place',
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Get saved place by ID
+   */
+  getSavedPlaceById: (id: string) => {
+    return get().savedPlaces.find((p) => p.id === id);
+  },
+
+  /**
+   * Increment usage count for a saved place
+   */
+  incrementPlaceUsage: async (id: string) => {
+    try {
+      const { incrementPlaceUsage: dbIncrementPlaceUsage } = await import(
+        '../storage/database'
+      );
+
+      const currentPlaces = get().savedPlaces;
+      const updatedPlaces = currentPlaces.map((place) =>
+        place.id === id
+          ? {
+              ...place,
+              usageCount: place.usageCount + 1,
+              lastUsedAt: Date.now(),
+            }
+          : place
+      );
+
+      // Update in database
+      await dbIncrementPlaceUsage(id);
+
+      set({
+        savedPlaces: updatedPlaces,
+      });
+
+      console.log(`[Store] Incremented usage for saved place: ${id}`);
+    } catch (error) {
+      console.error('[Store] Failed to increment place usage:', error);
+      // Don't throw - this is a non-critical operation
+    }
+  },
+
+  /**
    * Check if user can add more reminders (free tier limit)
    */
   canAddMoreReminders: () => {
@@ -348,7 +496,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const { loadAllReminders, loadEntitlements, initDatabase } = await import(
+      const { loadAllReminders, loadEntitlements, loadAllSavedPlaces, initDatabase } = await import(
         '../storage/database'
       );
 
@@ -358,16 +506,20 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       // Load reminders
       const reminders = await loadAllReminders();
 
+      // Load saved places
+      const savedPlaces = await loadAllSavedPlaces();
+
       // Load payment entitlements
       const entitlements = await loadEntitlements();
 
       set({
         reminders,
+        savedPlaces,
         entitlements,
         isLoading: false,
       });
 
-      console.log(`[Store] Loaded ${reminders.length} reminders from storage`);
+      console.log(`[Store] Loaded ${reminders.length} reminders and ${savedPlaces.length} saved places from storage`);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load data',

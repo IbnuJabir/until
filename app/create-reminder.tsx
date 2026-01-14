@@ -8,10 +8,13 @@ import {
   createReminder,
   createTrigger,
   LocationConfig,
+  SavedPlace,
+  createSavedPlace,
 } from '@/app/src/domain';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import { useScreenTime } from '@/app/src/hooks/useScreenTime';
-import LocationPicker from '@/app/src/ui/LocationPicker';
+import SavedPlacesList from '@/app/src/ui/SavedPlacesList';
+import MapPicker from '@/app/src/ui/MapPicker';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import {
@@ -29,7 +32,7 @@ import {
 
 export default function CreateReminderScreen() {
   const router = useRouter();
-  const { addReminder, entitlements } = useReminderStore();
+  const { addReminder, addSavedPlace, incrementPlaceUsage, entitlements } = useReminderStore();
   const screenTime = useScreenTime();
 
   const [title, setTitle] = useState('');
@@ -38,7 +41,8 @@ export default function CreateReminderScreen() {
   const [isCreating, setIsCreating] = useState(false);
   const [selectedAppCount, setSelectedAppCount] = useState<number>(0);
   const [selectedLocation, setSelectedLocation] = useState<LocationConfig | null>(null);
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showSavedPlacesList, setShowSavedPlacesList] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
 
   const isPro = entitlements.hasProAccess;
 
@@ -102,10 +106,10 @@ export default function CreateReminderScreen() {
       return;
     }
 
-    // If selecting "When I arrive somewhere", show location picker
+    // If selecting "When I arrive somewhere", show saved places list
     if (triggerType === TriggerType.LOCATION_ENTER) {
       if (!selectedTriggers.includes(triggerType)) {
-        setShowLocationPicker(true);
+        setShowSavedPlacesList(true);
       } else {
         // Deselecting - remove trigger and clear selected location
         setSelectedTriggers((prev) => prev.filter((t) => t !== triggerType));
@@ -170,19 +174,63 @@ export default function CreateReminderScreen() {
     }
   };
 
-  const handleLocationSave = (location: LocationConfig) => {
-    setSelectedLocation(location);
+  // Handle selecting an existing saved place
+  const handleSelectSavedPlace = async (place: SavedPlace) => {
+    setSelectedLocation({
+      latitude: place.latitude,
+      longitude: place.longitude,
+      radius: place.radius,
+      name: place.name,
+    });
     setSelectedTriggers((prev) => [...prev, TriggerType.LOCATION_ENTER]);
-    setShowLocationPicker(false);
+    setShowSavedPlacesList(false);
+
+    // Increment usage count for this place
+    await incrementPlaceUsage(place.id);
 
     Alert.alert(
       'Location Set',
-      `Reminder will trigger when you arrive at ${location.name || 'the selected location'} (within ${location.radius}m).`
+      `Reminder will trigger when you arrive at ${place.name} (within ${place.radius}m).`
     );
   };
 
-  const handleLocationCancel = () => {
-    setShowLocationPicker(false);
+  // Handle adding a new place (show map picker)
+  const handleAddNewPlace = () => {
+    setShowSavedPlacesList(false);
+    setShowMapPicker(true);
+  };
+
+  // Handle saving a new place from map picker
+  const handleMapPickerSave = async (location: LocationConfig & { name: string }) => {
+    try {
+      // Create and save the new place
+      const newPlace = createSavedPlace(
+        location.name,
+        location.latitude,
+        location.longitude,
+        location.radius
+      );
+      await addSavedPlace(newPlace);
+
+      // Set it as the selected location for this reminder
+      setSelectedLocation(location);
+      setSelectedTriggers((prev) => [...prev, TriggerType.LOCATION_ENTER]);
+      setShowMapPicker(false);
+
+      Alert.alert(
+        'Location Saved',
+        `"${location.name}" has been saved and set as the trigger location.`
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save location. Please try again.');
+    }
+  };
+
+  // Handle canceling map picker
+  const handleMapPickerCancel = () => {
+    setShowMapPicker(false);
+    // Show saved places list again
+    setShowSavedPlacesList(true);
   };
 
   const handleCreate = async () => {
@@ -380,11 +428,27 @@ export default function CreateReminderScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Location Picker Modal */}
-      <LocationPicker
-        visible={showLocationPicker}
-        onSave={handleLocationSave}
-        onCancel={handleLocationCancel}
+      {/* Saved Places List Modal */}
+      {showSavedPlacesList && (
+        <View style={styles.fullScreenModal}>
+          <SavedPlacesList
+            onSelectPlace={handleSelectSavedPlace}
+            onAddNewPlace={handleAddNewPlace}
+          />
+          <TouchableOpacity
+            style={styles.closeModalButton}
+            onPress={() => setShowSavedPlacesList(false)}
+          >
+            <Text style={styles.closeModalText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Map Picker Modal */}
+      <MapPicker
+        visible={showMapPicker}
+        onSave={handleMapPickerSave}
+        onCancel={handleMapPickerCancel}
       />
     </View>
   );
@@ -632,5 +696,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000',
     fontWeight: '500',
+  },
+  fullScreenModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    zIndex: 1000,
+  },
+  closeModalButton: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  closeModalText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
   },
 });

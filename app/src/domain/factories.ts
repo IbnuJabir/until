@@ -12,6 +12,7 @@ import {
   TriggerConfig,
   ConditionType,
   ConditionConfig,
+  SavedPlace,
 } from './types';
 
 /**
@@ -105,4 +106,28 @@ export function hasReminderExpired(reminder: Reminder): boolean {
     return false;
   }
   return Date.now() > reminder.expiresAt;
+}
+
+/**
+ * Create a new SavedPlace
+ */
+export function createSavedPlace(
+  name: string,
+  latitude: number,
+  longitude: number,
+  radius: number = 100,
+  icon?: string,
+  address?: string
+): SavedPlace {
+  return {
+    id: generateId(),
+    name,
+    latitude,
+    longitude,
+    radius,
+    icon,
+    address,
+    createdAt: Date.now(),
+    usageCount: 0,
+  };
 }

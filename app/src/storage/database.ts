@@ -9,7 +9,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { Reminder, Trigger, Condition, PaymentEntitlement } from '../domain';
+import { Reminder, Trigger, Condition, PaymentEntitlement, SavedPlace } from '../domain';
 
 const DATABASE_NAME = 'until.db';
 
@@ -89,6 +89,28 @@ export async function initDatabase(): Promise<void> {
   db.execSync(`
     INSERT OR IGNORE INTO entitlements (id, has_pro_access, subscription_active)
     VALUES (1, 0, 0);
+  `);
+
+  // Create saved_places table
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS saved_places (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      radius INTEGER NOT NULL DEFAULT 100,
+      icon TEXT,
+      address TEXT,
+      created_at INTEGER NOT NULL,
+      last_used_at INTEGER,
+      usage_count INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+
+  // Create index on created_at for ordering
+  db.execSync(`
+    CREATE INDEX IF NOT EXISTS idx_saved_places_created_at
+    ON saved_places(created_at DESC);
   `);
 
   console.log('[Database] Initialized successfully');
@@ -368,6 +390,7 @@ export async function clearDatabase(): Promise<void> {
     db.execSync('DELETE FROM reminders;');
     db.execSync('DELETE FROM triggers;');
     db.execSync('DELETE FROM conditions;');
+    db.execSync('DELETE FROM saved_places;');
     db.execSync('UPDATE entitlements SET has_pro_access = 0, subscription_active = 0 WHERE id = 1;');
     db.execSync('COMMIT;');
     console.log('[Database] Cleared all data');
@@ -376,4 +399,174 @@ export async function clearDatabase(): Promise<void> {
     console.error('[Database] Failed to clear database:', error);
     throw error;
   }
+}
+
+// ============================================================================
+// SAVED PLACES CRUD
+// ============================================================================
+
+/**
+ * Save a new place
+ */
+export async function saveSavedPlace(place: SavedPlace): Promise<void> {
+  const db = openDatabase();
+
+  db.runSync(
+    `INSERT OR REPLACE INTO saved_places
+    (id, name, latitude, longitude, radius, icon, address, created_at, last_used_at, usage_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      place.id,
+      place.name,
+      place.latitude,
+      place.longitude,
+      place.radius,
+      place.icon || null,
+      place.address || null,
+      place.createdAt,
+      place.lastUsedAt || null,
+      place.usageCount,
+    ]
+  );
+
+  console.log(`[Database] Saved place: ${place.name}`);
+}
+
+/**
+ * Load all saved places
+ */
+export async function loadAllSavedPlaces(): Promise<SavedPlace[]> {
+  const db = openDatabase();
+
+  const rows = db.getAllSync<any>(
+    'SELECT * FROM saved_places ORDER BY created_at DESC;'
+  );
+
+  const places: SavedPlace[] = rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    radius: row.radius,
+    icon: row.icon,
+    address: row.address,
+    createdAt: row.created_at,
+    lastUsedAt: row.last_used_at,
+    usageCount: row.usage_count,
+  }));
+
+  console.log(`[Database] Loaded ${places.length} saved places`);
+  return places;
+}
+
+/**
+ * Get a single saved place by ID
+ */
+export async function getSavedPlace(id: string): Promise<SavedPlace | null> {
+  const db = openDatabase();
+
+  const row = db.getFirstSync<any>(
+    'SELECT * FROM saved_places WHERE id = ?',
+    [id]
+  );
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    name: row.name,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    radius: row.radius,
+    icon: row.icon,
+    address: row.address,
+    createdAt: row.created_at,
+    lastUsedAt: row.last_used_at,
+    usageCount: row.usage_count,
+  };
+}
+
+/**
+ * Update a saved place
+ */
+export async function updateSavedPlace(
+  id: string,
+  updates: Partial<SavedPlace>
+): Promise<void> {
+  const db = openDatabase();
+
+  // Build dynamic SQL for only provided fields
+  const fields: string[] = [];
+  const values: any[] = [];
+
+  if (updates.name !== undefined) {
+    fields.push('name = ?');
+    values.push(updates.name);
+  }
+  if (updates.latitude !== undefined) {
+    fields.push('latitude = ?');
+    values.push(updates.latitude);
+  }
+  if (updates.longitude !== undefined) {
+    fields.push('longitude = ?');
+    values.push(updates.longitude);
+  }
+  if (updates.radius !== undefined) {
+    fields.push('radius = ?');
+    values.push(updates.radius);
+  }
+  if (updates.icon !== undefined) {
+    fields.push('icon = ?');
+    values.push(updates.icon);
+  }
+  if (updates.address !== undefined) {
+    fields.push('address = ?');
+    values.push(updates.address);
+  }
+  if (updates.lastUsedAt !== undefined) {
+    fields.push('last_used_at = ?');
+    values.push(updates.lastUsedAt);
+  }
+  if (updates.usageCount !== undefined) {
+    fields.push('usage_count = ?');
+    values.push(updates.usageCount);
+  }
+
+  if (fields.length === 0) {
+    return; // Nothing to update
+  }
+
+  values.push(id); // Add id for WHERE clause
+
+  const sql = `UPDATE saved_places SET ${fields.join(', ')} WHERE id = ?`;
+  db.runSync(sql, values);
+
+  console.log(`[Database] Updated saved place: ${id}`);
+}
+
+/**
+ * Delete a saved place
+ */
+export async function deleteSavedPlace(id: string): Promise<void> {
+  const db = openDatabase();
+
+  db.runSync('DELETE FROM saved_places WHERE id = ?', [id]);
+
+  console.log(`[Database] Deleted saved place: ${id}`);
+}
+
+/**
+ * Increment usage count for a saved place
+ */
+export async function incrementPlaceUsage(id: string): Promise<void> {
+  const db = openDatabase();
+
+  db.runSync(
+    'UPDATE saved_places SET usage_count = usage_count + 1, last_used_at = ? WHERE id = ?',
+    [Date.now(), id]
+  );
+
+  console.log(`[Database] Incremented usage count for place: ${id}`);
 }

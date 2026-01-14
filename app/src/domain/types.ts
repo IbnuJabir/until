@@ -158,6 +158,23 @@ export interface AppOpenedEvent extends SystemEvent {
 }
 
 // ============================================================================
+// SAVED PLACES
+// ============================================================================
+
+export interface SavedPlace {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  radius: number; // Default radius for this place (50-500m)
+  icon?: string; // Optional emoji icon
+  address?: string; // Reverse geocoded address (optional)
+  createdAt: number;
+  lastUsedAt?: number;
+  usageCount: number;
+}
+
+// ============================================================================
 // PAYMENT / ENTITLEMENTS
 // ============================================================================
 
