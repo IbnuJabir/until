@@ -7,9 +7,11 @@ import {
   TriggerType,
   createReminder,
   createTrigger,
+  LocationConfig,
 } from '@/app/src/domain';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import { useScreenTime } from '@/app/src/hooks/useScreenTime';
+import LocationPicker from '@/app/src/ui/LocationPicker';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import {
@@ -35,6 +37,8 @@ export default function CreateReminderScreen() {
   const [selectedTriggers, setSelectedTriggers] = useState<TriggerType[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedAppCount, setSelectedAppCount] = useState<number>(0);
+  const [selectedLocation, setSelectedLocation] = useState<LocationConfig | null>(null);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   const isPro = entitlements.hasProAccess;
 
@@ -98,6 +102,18 @@ export default function CreateReminderScreen() {
       return;
     }
 
+    // If selecting "When I arrive somewhere", show location picker
+    if (triggerType === TriggerType.LOCATION_ENTER) {
+      if (!selectedTriggers.includes(triggerType)) {
+        setShowLocationPicker(true);
+      } else {
+        // Deselecting - remove trigger and clear selected location
+        setSelectedTriggers((prev) => prev.filter((t) => t !== triggerType));
+        setSelectedLocation(null);
+      }
+      return;
+    }
+
     setSelectedTriggers((prev) =>
       prev.includes(triggerType)
         ? prev.filter((t) => t !== triggerType)
@@ -154,6 +170,21 @@ export default function CreateReminderScreen() {
     }
   };
 
+  const handleLocationSave = (location: LocationConfig) => {
+    setSelectedLocation(location);
+    setSelectedTriggers((prev) => [...prev, TriggerType.LOCATION_ENTER]);
+    setShowLocationPicker(false);
+
+    Alert.alert(
+      'Location Set',
+      `Reminder will trigger when you arrive at ${location.name || 'the selected location'} (within ${location.radius}m).`
+    );
+  };
+
+  const handleLocationCancel = () => {
+    setShowLocationPicker(false);
+  };
+
   const handleCreate = async () => {
     // Validation
     if (!title.trim()) {
@@ -172,10 +203,16 @@ export default function CreateReminderScreen() {
       return;
     }
 
+    // Validate location selection if LOCATION_ENTER trigger is selected
+    if (selectedTriggers.includes(TriggerType.LOCATION_ENTER) && !selectedLocation) {
+      Alert.alert('Error', 'Please select a location for the location trigger');
+      return;
+    }
+
     setIsCreating(true);
 
     try {
-      // Create triggers with config for APP_OPENED
+      // Create triggers with config for APP_OPENED and LOCATION_ENTER
       const triggers = selectedTriggers.map((type) => {
         if (type === TriggerType.APP_OPENED) {
           // Screen Time API uses tokenized app identifiers (not bundle IDs)
@@ -184,6 +221,9 @@ export default function CreateReminderScreen() {
             bundleId: 'screentime.apps.selected',
             appName: `${selectedAppCount} selected app${selectedAppCount > 1 ? 's' : ''}`,
           });
+        }
+        if (type === TriggerType.LOCATION_ENTER && selectedLocation) {
+          return createTrigger(type, selectedLocation);
         }
         return createTrigger(type);
       });
@@ -269,7 +309,9 @@ export default function CreateReminderScreen() {
                   const isSelected = selectedTriggers.includes(option.type);
                   const isLocked = option.isPro && !isPro;
                   const isAppTrigger = option.type === TriggerType.APP_OPENED;
+                  const isLocationTrigger = option.type === TriggerType.LOCATION_ENTER;
                   const showAppCount = isAppTrigger && isSelected && selectedAppCount > 0;
+                  const showLocationInfo = isLocationTrigger && isSelected && selectedLocation;
 
                   return (
                     <TouchableOpacity
@@ -290,6 +332,11 @@ export default function CreateReminderScreen() {
                           {showAppCount && (
                             <Text style={styles.selectedAppLabel}>
                               {selectedAppCount} app{selectedAppCount > 1 ? 's' : ''} selected
+                            </Text>
+                          )}
+                          {showLocationInfo && (
+                            <Text style={styles.selectedAppLabel}>
+                              {selectedLocation.name} ({selectedLocation.radius}m)
                             </Text>
                           )}
                           {isLocked && (
@@ -332,6 +379,13 @@ export default function CreateReminderScreen() {
               )} */}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Location Picker Modal */}
+      <LocationPicker
+        visible={showLocationPicker}
+        onSave={handleLocationSave}
+        onCancel={handleLocationCancel}
+      />
     </View>
   );
 }

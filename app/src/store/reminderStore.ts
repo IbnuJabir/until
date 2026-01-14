@@ -110,6 +110,32 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
         throw new Error('Free tier limit reached. Upgrade to add more reminders.');
       }
 
+      // Register geofences for location triggers
+      for (const trigger of reminder.triggers) {
+        if (trigger.type === 'LOCATION_ENTER' && trigger.config) {
+          const { registerGeofence } = await import('../native-bridge/LocationBridge');
+          const locationConfig = trigger.config as {
+            latitude: number;
+            longitude: number;
+            radius: number;
+            name?: string;
+          };
+
+          try {
+            await registerGeofence(
+              `reminder_${reminder.id}`,
+              locationConfig.latitude,
+              locationConfig.longitude,
+              locationConfig.radius
+            );
+            console.log(`[Store] Registered geofence for reminder: ${reminder.title}`);
+          } catch (error) {
+            console.error('[Store] Failed to register geofence:', error);
+            // Don't fail the whole operation, just log the error
+          }
+        }
+      }
+
       set({
         reminders: [...currentReminders, reminder],
         isLoading: false,
@@ -171,7 +197,25 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       );
 
       const currentReminders = get().reminders;
+      const reminder = currentReminders.find((r) => r.id === id);
       const filteredReminders = currentReminders.filter((r) => r.id !== id);
+
+      // Unregister geofences for location triggers
+      if (reminder) {
+        for (const trigger of reminder.triggers) {
+          if (trigger.type === 'LOCATION_ENTER') {
+            const { unregisterGeofence } = await import('../native-bridge/LocationBridge');
+
+            try {
+              await unregisterGeofence(`reminder_${id}`);
+              console.log(`[Store] Unregistered geofence for reminder: ${reminder.title}`);
+            } catch (error) {
+              console.warn('[Store] Failed to unregister geofence:', error);
+              // Don't fail the whole operation, just log the warning
+            }
+          }
+        }
+      }
 
       // Delete from database
       await dbDeleteReminder(id);
