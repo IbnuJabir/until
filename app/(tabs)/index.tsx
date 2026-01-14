@@ -82,12 +82,17 @@ export default function RemindersScreen() {
   const activeReminders = reminders.filter((r) => r.status === ReminderStatus.WAITING);
   const firedReminders = reminders.filter((r) => r.status === ReminderStatus.FIRED);
 
+  const handleReminderPress = (id: string) => {
+    router.push(`/reminder-detail?id=${id}` as any);
+  };
+
   const renderReminderItem = ({ item }: { item: Reminder }) => {
     const isFired = item.status === ReminderStatus.FIRED;
 
     return (
       <TouchableOpacity
         style={[styles.reminderCard, isFired && styles.reminderCardFired]}
+        onPress={() => handleReminderPress(item.id)}
         onLongPress={() => handleDeleteReminder(item.id, item.title)}
         activeOpacity={0.7}
       >

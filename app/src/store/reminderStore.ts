@@ -45,6 +45,7 @@ interface ReminderStore {
   // Actions
   addReminder: (reminder: Reminder) => Promise<void>;
   updateReminder: (id: string, updates: Partial<Reminder>) => Promise<void>;
+  updateReminderStatus: (id: string, status: ReminderStatus) => Promise<void>;
   deleteReminder: (id: string) => Promise<void>;
   fireReminder: (id: string) => Promise<void>;
 
@@ -149,6 +150,13 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       });
       throw error;
     }
+  },
+
+  /**
+   * Update reminder status
+   */
+  updateReminderStatus: async (id: string, status: ReminderStatus) => {
+    await get().updateReminder(id, { status });
   },
 
   /**
