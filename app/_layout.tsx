@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useNativeEvents } from '@/app/src/hooks/useNativeEvents';
+import { useReminderStore } from '@/app/src/store/reminderStore';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -15,14 +16,39 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const { fireReminder } = useReminderStore();
 
   // Initialize native event listeners
   useNativeEvents();
 
+  // Handle notification received (mark reminder as fired)
+  useEffect(() => {
+    const receivedSubscription = Notifications.addNotificationReceivedListener(
+      async (notification) => {
+        const reminderId = notification.request.content.data?.reminderId;
+
+        if (reminderId && typeof reminderId === 'string') {
+          console.log('[App] Scheduled notification received, marking reminder as fired:', reminderId);
+
+          try {
+            await fireReminder(reminderId);
+            console.log('[App] ✅ Reminder marked as fired:', reminderId);
+          } catch (error) {
+            console.error('[App] Failed to mark reminder as fired:', error);
+          }
+        }
+      }
+    );
+
+    return () => {
+      receivedSubscription.remove();
+    };
+  }, [fireReminder]);
+
   // Handle notification tap (deep link to reminder detail)
   useEffect(() => {
     // Handle notification tap when app is already running
-    const subscription = Notifications.addNotificationResponseReceivedListener(
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const reminderId = response.notification.request.content.data?.reminderId;
 
@@ -55,7 +81,7 @@ export default function RootLayout() {
     });
 
     return () => {
-      subscription.remove();
+      responseSubscription.remove();
     };
   }, [router]);
 
