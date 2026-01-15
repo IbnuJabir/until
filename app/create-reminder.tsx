@@ -467,8 +467,10 @@ export default function CreateReminderScreen() {
                   const isLocked = option.isPro && !isPro;
                   const isAppTrigger = option.type === TriggerType.APP_OPENED;
                   const isLocationTrigger = option.type === TriggerType.LOCATION_ENTER;
+                  const isScheduledTimeTrigger = option.type === TriggerType.SCHEDULED_TIME;
                   const showAppCount = isAppTrigger && isSelected && selectedAppCount > 0;
                   const showLocationInfo = isLocationTrigger && isSelected && selectedLocation;
+                  const showScheduledTime = isScheduledTimeTrigger && isSelected;
 
                   return (
                     <TouchableOpacity
@@ -494,6 +496,18 @@ export default function CreateReminderScreen() {
                           {showLocationInfo && (
                             <Text style={styles.selectedAppLabel}>
                               {selectedLocation.name} ({selectedLocation.radius}m)
+                            </Text>
+                          )}
+                          {showScheduledTime && (
+                            <Text style={styles.selectedAppLabel}>
+                              {scheduledDateTime.toLocaleDateString([], {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })} at {scheduledDateTime.toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
                             </Text>
                           )}
                           {isLocked && (
@@ -629,11 +643,25 @@ export default function CreateReminderScreen() {
                 </TouchableOpacity>
               </View>
               <DateTimePicker
-                value={scheduledDateTime}
+                value={tempDateTime}
                 mode="time"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={handleTimeChange}
               />
+              <View style={styles.datePickerButtons}>
+                <TouchableOpacity
+                  style={styles.datePickerCancelButton}
+                  onPress={handleDateTimePickerCancel}
+                >
+                  <Text style={styles.datePickerCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.datePickerConfirmButton}
+                  onPress={handleTimeConfirm}
+                >
+                  <Text style={styles.datePickerConfirmText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -956,5 +984,38 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#999',
     fontWeight: '300',
+  },
+  datePickerButtons: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  datePickerCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+  },
+  datePickerCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  datePickerConfirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+  },
+  datePickerConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

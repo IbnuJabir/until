@@ -17,6 +17,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -61,7 +63,56 @@ export async function getNotificationPermissionStatus(): Promise<string> {
 }
 
 /**
- * Fire a local notification for a reminder
+ * Schedule a notification to fire at a specific date/time
+ */
+export async function scheduleNotificationAtTime(
+  reminder: Reminder,
+  scheduledDateTime: number
+): Promise<string> {
+  try {
+    // Check permission first
+    const hasPermission = await requestNotificationPermissions();
+
+    if (!hasPermission) {
+      throw new Error('Notification permission not granted');
+    }
+
+    // Validate that the scheduled time is in the future
+    if (scheduledDateTime <= Date.now()) {
+      throw new Error('Scheduled time must be in the future');
+    }
+
+    // Schedule notification for specific timestamp
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: reminder.title,
+        body: reminder.description || 'Your reminder is ready',
+        data: {
+          reminderId: reminder.id,
+          firedAt: Date.now(),
+        },
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        // iOS 15+ time-sensitive notifications
+        interruptionLevel: 'timeSensitive' as any,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: scheduledDateTime,
+      } as Notifications.DateTriggerInput,
+    });
+
+    console.log(`[Notifications] Scheduled notification ${notificationId} for reminder: ${reminder.title} at ${new Date(scheduledDateTime).toISOString()}`);
+
+    return notificationId;
+  } catch (error) {
+    console.error('[Notifications] Failed to schedule notification:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fire a local notification for a reminder (immediately)
  */
 export async function fireNotification(reminder: Reminder): Promise<string> {
   try {
@@ -83,6 +134,9 @@ export async function fireNotification(reminder: Reminder): Promise<string> {
         },
         sound: true,
         priority: Notifications.AndroidNotificationPriority.HIGH,
+        // iOS 15+ time-sensitive notifications (like Calendar/Reminders apps)
+        // This makes the notification more prominent with louder sound and longer display
+        interruptionLevel: 'timeSensitive' as any, // Type not exported but supported by expo-notifications
       },
       trigger: null, // Fire immediately
     });
