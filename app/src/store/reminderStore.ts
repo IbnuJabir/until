@@ -148,6 +148,31 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
         }
       }
 
+      // Schedule notifications for SCHEDULED_TIME triggers
+      for (const trigger of reminder.triggers) {
+        if (trigger.type === 'SCHEDULED_TIME' && trigger.config) {
+          const { scheduleNotificationAtTime } = await import('../utils/NotificationService');
+          const scheduledConfig = trigger.config as {
+            scheduledDateTime: number;
+          };
+
+          try {
+            const notificationId = await scheduleNotificationAtTime(
+              reminder,
+              scheduledConfig.scheduledDateTime
+            );
+
+            // Store notification ID for later cancellation
+            reminder.notificationId = notificationId;
+
+            console.log(`[Store] Scheduled notification for reminder: ${reminder.title} at ${new Date(scheduledConfig.scheduledDateTime).toLocaleString()}`);
+          } catch (error) {
+            console.error('[Store] Failed to schedule notification:', error);
+            // Don't fail the whole operation, just log the error
+          }
+        }
+      }
+
       set({
         reminders: [...currentReminders, reminder],
         isLoading: false,
@@ -212,7 +237,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       const reminder = currentReminders.find((r) => r.id === id);
       const filteredReminders = currentReminders.filter((r) => r.id !== id);
 
-      // Unregister geofences for location triggers
+      // Unregister geofences for location triggers and cancel scheduled notifications
       if (reminder) {
         for (const trigger of reminder.triggers) {
           if (trigger.type === 'LOCATION_ENTER') {
@@ -225,6 +250,19 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
               console.warn('[Store] Failed to unregister geofence:', error);
               // Don't fail the whole operation, just log the warning
             }
+          }
+        }
+
+        // Cancel scheduled notifications for SCHEDULED_TIME triggers
+        if (reminder.notificationId) {
+          const Notifications = await import('expo-notifications');
+
+          try {
+            await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
+            console.log(`[Store] Cancelled scheduled notification for reminder: ${reminder.title}`);
+          } catch (error) {
+            console.warn('[Store] Failed to cancel scheduled notification:', error);
+            // Don't fail the whole operation, just log the warning
           }
         }
       }

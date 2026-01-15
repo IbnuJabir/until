@@ -7,9 +7,11 @@ import {
   TriggerType,
   createReminder,
   createTrigger,
+  createScheduledTimeTrigger,
   LocationConfig,
   SavedPlace,
   createSavedPlace,
+  ScheduledTimeConfig,
 } from '@/app/src/domain';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import { useScreenTime } from '@/app/src/hooks/useScreenTime';
@@ -28,7 +30,9 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function CreateReminderScreen() {
   const router = useRouter();
@@ -44,6 +48,12 @@ export default function CreateReminderScreen() {
   const [showSavedPlacesList, setShowSavedPlacesList] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
 
+  // Scheduled time state
+  const [scheduledDateTime, setScheduledDateTime] = useState<Date>(new Date(Date.now() + 3600000)); // Default: 1 hour from now
+  const [tempDateTime, setTempDateTime] = useState<Date>(new Date(Date.now() + 3600000)); // Temporary selection
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
   const isPro = entitlements.hasProAccess;
 
   // Check if user has selected apps when component mounts
@@ -54,6 +64,12 @@ export default function CreateReminderScreen() {
   }, [screenTime.hasAppsSelected]);
 
   const triggerOptions = [
+    {
+      type: TriggerType.SCHEDULED_TIME,
+      label: 'At a specific time',
+      icon: '⏰',
+      isPro: false, // Free feature
+    },
     {
       type: TriggerType.PHONE_UNLOCK,
       label: 'When I unlock my phone',
@@ -114,6 +130,19 @@ export default function CreateReminderScreen() {
         // Deselecting - remove trigger and clear selected location
         setSelectedTriggers((prev) => prev.filter((t) => t !== triggerType));
         setSelectedLocation(null);
+      }
+      return;
+    }
+
+    // If selecting "At a specific time", show date/time picker
+    if (triggerType === TriggerType.SCHEDULED_TIME) {
+      if (!selectedTriggers.includes(triggerType)) {
+        // Initialize temp with current scheduled time or 1 hour from now
+        setTempDateTime(scheduledDateTime);
+        setShowDatePicker(true);
+      } else {
+        // Deselecting - remove trigger
+        setSelectedTriggers((prev) => prev.filter((t) => t !== triggerType));
       }
       return;
     }
@@ -233,6 +262,71 @@ export default function CreateReminderScreen() {
     setShowSavedPlacesList(true);
   };
 
+  // Handle date selection (just update temp state)
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (selectedDate) {
+      // Update temporary date selection
+      const newDateTime = new Date(tempDateTime);
+      newDateTime.setFullYear(selectedDate.getFullYear());
+      newDateTime.setMonth(selectedDate.getMonth());
+      newDateTime.setDate(selectedDate.getDate());
+      setTempDateTime(newDateTime);
+    }
+  };
+
+  // Handle time selection (just update temp state)
+  const handleTimeChange = (event: any, selectedTime?: Date) => {
+    if (selectedTime) {
+      // Update temporary time selection
+      const newDateTime = new Date(tempDateTime);
+      newDateTime.setHours(selectedTime.getHours());
+      newDateTime.setMinutes(selectedTime.getMinutes());
+      setTempDateTime(newDateTime);
+    }
+  };
+
+  // Confirm date selection and move to time picker
+  const handleDateConfirm = () => {
+    setShowDatePicker(false);
+    setShowTimePicker(true);
+  };
+
+  // Confirm time selection and add trigger
+  const handleTimeConfirm = () => {
+    // Validate that time is in the future
+    if (tempDateTime.getTime() <= Date.now()) {
+      Alert.alert(
+        'Invalid Time',
+        'Please select a time in the future.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Reset to 1 hour from now
+              const newTime = new Date(Date.now() + 3600000);
+              setTempDateTime(newTime);
+              setScheduledDateTime(newTime);
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // Confirm the selection
+    setScheduledDateTime(tempDateTime);
+    setShowTimePicker(false);
+    setSelectedTriggers((prev) => [...prev, TriggerType.SCHEDULED_TIME]);
+  };
+
+  // Handle canceling date/time picker
+  const handleDateTimePickerCancel = () => {
+    setShowDatePicker(false);
+    setShowTimePicker(false);
+    // Reset temp to current scheduled time
+    setTempDateTime(scheduledDateTime);
+  };
+
   const handleCreate = async () => {
     // Validation
     if (!title.trim()) {
@@ -260,7 +354,7 @@ export default function CreateReminderScreen() {
     setIsCreating(true);
 
     try {
-      // Create triggers with config for APP_OPENED and LOCATION_ENTER
+      // Create triggers with config for APP_OPENED, LOCATION_ENTER, and SCHEDULED_TIME
       const triggers = selectedTriggers.map((type) => {
         if (type === TriggerType.APP_OPENED) {
           // Screen Time API uses tokenized app identifiers (not bundle IDs)
@@ -273,11 +367,26 @@ export default function CreateReminderScreen() {
         if (type === TriggerType.LOCATION_ENTER && selectedLocation) {
           return createTrigger(type, selectedLocation);
         }
+        if (type === TriggerType.SCHEDULED_TIME) {
+          return createScheduledTimeTrigger(scheduledDateTime.getTime());
+        }
         return createTrigger(type);
       });
 
       // Create reminder
       const reminder = createReminder(title.trim(), triggers, [], description.trim());
+
+      // Log location details if location trigger is selected
+      if (selectedTriggers.includes(TriggerType.LOCATION_ENTER) && selectedLocation) {
+        console.log('=================================================');
+        console.log('[CreateReminder] 📍 Location-based reminder created');
+        console.log('[CreateReminder] Reminder title:', title.trim());
+        console.log('[CreateReminder] Location name:', selectedLocation.name);
+        console.log('[CreateReminder] Latitude:', selectedLocation.latitude);
+        console.log('[CreateReminder] Longitude:', selectedLocation.longitude);
+        console.log('[CreateReminder] Radius:', selectedLocation.radius, 'meters');
+        console.log('=================================================');
+      }
 
       // Save to store (which persists to database)
       await addReminder(reminder);
@@ -450,6 +559,85 @@ export default function CreateReminderScreen() {
         onSave={handleMapPickerSave}
         onCancel={handleMapPickerCancel}
       />
+
+      {/* Date Picker Modal */}
+      {showDatePicker && (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showDatePicker}
+          onRequestClose={handleDateTimePickerCancel}
+        >
+          <View style={styles.datePickerOverlay}>
+            <TouchableOpacity
+              style={styles.datePickerBackdrop}
+              activeOpacity={1}
+              onPress={handleDateTimePickerCancel}
+            />
+            <View style={styles.datePickerModal}>
+              <View style={styles.datePickerHeader}>
+                <Text style={styles.datePickerTitle}>Select Date</Text>
+                <TouchableOpacity onPress={handleDateTimePickerCancel}>
+                  <Text style={styles.datePickerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempDateTime}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleDateChange}
+                minimumDate={new Date()}
+              />
+              <View style={styles.datePickerButtons}>
+                <TouchableOpacity
+                  style={styles.datePickerCancelButton}
+                  onPress={handleDateTimePickerCancel}
+                >
+                  <Text style={styles.datePickerCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.datePickerConfirmButton}
+                  onPress={handleDateConfirm}
+                >
+                  <Text style={styles.datePickerConfirmText}>Next</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Time Picker Modal */}
+      {showTimePicker && (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showTimePicker}
+          onRequestClose={handleDateTimePickerCancel}
+        >
+          <View style={styles.datePickerOverlay}>
+            <TouchableOpacity
+              style={styles.datePickerBackdrop}
+              activeOpacity={1}
+              onPress={handleDateTimePickerCancel}
+            />
+            <View style={styles.datePickerModal}>
+              <View style={styles.datePickerHeader}>
+                <Text style={styles.datePickerTitle}>Select Time</Text>
+                <TouchableOpacity onPress={handleDateTimePickerCancel}>
+                  <Text style={styles.datePickerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={scheduledDateTime}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleTimeChange}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -720,5 +908,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#666',
+  },
+  // Date/Time Picker Modal Styles
+  datePickerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  datePickerBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  datePickerModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    width: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    overflow: 'hidden',
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  datePickerClose: {
+    fontSize: 24,
+    color: '#999',
+    fontWeight: '300',
   },
 });

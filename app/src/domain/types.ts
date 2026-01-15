@@ -9,6 +9,7 @@
 
 export enum TriggerType {
   TIME_WINDOW = 'TIME_WINDOW',
+  SCHEDULED_TIME = 'SCHEDULED_TIME',
   PHONE_UNLOCK = 'PHONE_UNLOCK',
   LOCATION_ENTER = 'LOCATION_ENTER',
   CHARGING_STARTED = 'CHARGING_STARTED',
@@ -35,6 +36,10 @@ export interface TimeWindowConfig {
   daysOfWeek?: number[]; // 0-6 (Sunday = 0), optional
 }
 
+export interface ScheduledTimeConfig {
+  scheduledDateTime: number; // Unix timestamp in milliseconds
+}
+
 export interface LocationConfig {
   latitude: number;
   longitude: number;
@@ -49,6 +54,7 @@ export interface AppOpenedConfig {
 
 export type TriggerConfig =
   | TimeWindowConfig
+  | ScheduledTimeConfig
   | LocationConfig
   | AppOpenedConfig
   | null; // For PHONE_UNLOCK and CHARGING_STARTED (no config needed)
@@ -115,6 +121,7 @@ export interface Reminder {
   createdAt: number; // Unix timestamp
   firedAt?: number; // Unix timestamp when notification was sent
   expiresAt?: number; // Optional expiration timestamp
+  notificationId?: string; // Scheduled notification ID for cancellation (SCHEDULED_TIME reminders)
 }
 
 // ============================================================================

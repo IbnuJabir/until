@@ -13,6 +13,7 @@ import {
   ConditionType,
   ConditionConfig,
   SavedPlace,
+  ScheduledTimeConfig,
 } from './types';
 
 /**
@@ -106,6 +107,16 @@ export function hasReminderExpired(reminder: Reminder): boolean {
     return false;
   }
   return Date.now() > reminder.expiresAt;
+}
+
+/**
+ * Create a scheduled time trigger
+ */
+export function createScheduledTimeTrigger(scheduledDateTime: number): Trigger {
+  const config: ScheduledTimeConfig = {
+    scheduledDateTime,
+  };
+  return createTrigger(TriggerType.SCHEDULED_TIME, config);
 }
 
 /**
