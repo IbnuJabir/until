@@ -4,8 +4,8 @@
  * For now, this is a placeholder
  */
 
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function PaywallScreen() {
   const router = useRouter();

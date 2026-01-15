@@ -90,10 +90,15 @@ export default function SavedPlacesList({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Select a Place</Text>
-        <Text style={styles.headerSubtitle}>
-          Choose from your saved locations or add a new one
-        </Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Select a Place</Text>
+          <Text style={styles.headerSubtitle}>
+            Choose from your saved locations or add a new one
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.addButton} onPress={onAddNewPlace}>
+          <Text style={styles.addButtonText}>+ Add</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -103,10 +108,6 @@ export default function SavedPlacesList({
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={renderEmptyState}
       />
-
-      <TouchableOpacity style={styles.addButton} onPress={onAddNewPlace}>
-        <Text style={styles.addButtonText}>+ Add New Place</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -117,11 +118,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  headerLeft: {
+    flex: 1,
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: 24,
@@ -135,6 +143,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    paddingBottom: 120,
     flexGrow: 1,
   },
   placeCard: {
@@ -186,13 +195,14 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    margin: 16,
-    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   addButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
   },
