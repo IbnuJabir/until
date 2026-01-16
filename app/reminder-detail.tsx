@@ -70,12 +70,9 @@ export default function ReminderDetailScreen() {
             try {
               setIsDeleting(true);
               await deleteReminder(reminder.id);
-              setToastMessage('Reminder deleted');
-              setShowToast(true);
-              // Delay navigation to show toast
-              setTimeout(() => {
-                router.back();
-              }, 500);
+              // Navigate back and show toast on list page
+              router.back();
+              router.replace('/(tabs)?message=Reminder deleted' as any);
             } catch (error) {
               setIsDeleting(false);
               Alert.alert('Error', 'Failed to delete reminder');

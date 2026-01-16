@@ -4,24 +4,26 @@
  */
 
 import {
-  TriggerType,
   createReminder,
-  createTrigger,
+  createSavedPlace,
   createScheduledTimeTrigger,
+  createTrigger,
   LocationConfig,
   SavedPlace,
-  createSavedPlace,
-  ScheduledTimeConfig,
+  TriggerType
 } from '@/app/src/domain';
-import { useReminderStore } from '@/app/src/store/reminderStore';
 import { useScreenTime } from '@/app/src/hooks/useScreenTime';
-import SavedPlacesList from '@/app/src/ui/SavedPlacesList';
+import { useReminderStore } from '@/app/src/store/reminderStore';
 import MapPicker from '@/app/src/ui/MapPicker';
+import SavedPlacesList from '@/app/src/ui/SavedPlacesList';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -29,11 +31,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
-  Modal,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Toast } from '@/app/src/utils/Toast';
 
 export default function CreateReminderScreen() {
   const router = useRouter();
@@ -61,10 +59,6 @@ export default function CreateReminderScreen() {
   const [tempActivationDateTime, setTempActivationDateTime] = useState<Date>(new Date());
   const [showActivationDatePicker, setShowActivationDatePicker] = useState(false);
   const [showActivationTimePicker, setShowActivationTimePicker] = useState(false);
-
-  // Toast state
-  const [toastMessage, setToastMessage] = useState('');
-  const [showToast, setShowToast] = useState(false);
 
   const isPro = entitlements.hasProAccess;
 
@@ -469,28 +463,23 @@ export default function CreateReminderScreen() {
       const reminder = createReminder(title.trim(), triggers, [], description.trim());
 
       // Log location details if location trigger is selected
-      if (selectedTriggers.includes(TriggerType.LOCATION_ENTER) && selectedLocation) {
-        console.log('=================================================');
-        console.log('[CreateReminder] 📍 Location-based reminder created');
-        console.log('[CreateReminder] Reminder title:', title.trim());
-        console.log('[CreateReminder] Location name:', selectedLocation.name);
-        console.log('[CreateReminder] Latitude:', selectedLocation.latitude);
-        console.log('[CreateReminder] Longitude:', selectedLocation.longitude);
-        console.log('[CreateReminder] Radius:', selectedLocation.radius, 'meters');
-        console.log('=================================================');
-      }
+      // if (selectedTriggers.includes(TriggerType.LOCATION_ENTER) && selectedLocation) {
+      //   console.log('=================================================');
+      //   console.log('[CreateReminder] 📍 Location-based reminder created');
+      //   console.log('[CreateReminder] Reminder title:', title.trim());
+      //   console.log('[CreateReminder] Location name:', selectedLocation.name);
+      //   console.log('[CreateReminder] Latitude:', selectedLocation.latitude);
+      //   console.log('[CreateReminder] Longitude:', selectedLocation.longitude);
+      //   console.log('[CreateReminder] Radius:', selectedLocation.radius, 'meters');
+      //   console.log('=================================================');
+      // }
 
       // Save to store (which persists to database)
       await addReminder(reminder);
 
-      // Show success toast
-      setToastMessage('Reminder created!');
-      setShowToast(true);
-
-      // Navigate back after a short delay to show the toast
-      setTimeout(() => {
-        router.back();
-      }, 800);
+      // Dismiss modal and navigate back to list page with toast
+      router.dismissAll();
+      router.replace('/(tabs)?message=Reminder created!' as any);
     } catch (error) {
       Alert.alert(
         'Error',
@@ -918,14 +907,6 @@ export default function CreateReminderScreen() {
           </View>
         </Modal>
       )}
-
-      {/* Toast Notification */}
-      <Toast
-        message={toastMessage}
-        visible={showToast}
-        duration={2000}
-        onHide={() => setShowToast(false)}
-      />
     </View>
   );
 }

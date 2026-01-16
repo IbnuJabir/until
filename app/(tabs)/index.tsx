@@ -13,13 +13,15 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import { Reminder, ReminderStatus, isReminderActive } from '@/app/src/domain';
 import { format } from 'date-fns';
+import { Toast } from '@/app/src/utils/Toast';
 
 export default function RemindersScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ message?: string }>();
   const {
     reminders,
     deleteReminder,
@@ -30,11 +32,21 @@ export default function RemindersScreen() {
   } = useReminderStore();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
 
   // Load reminders on mount
   useEffect(() => {
     loadFromStorage();
   }, []);
+
+  // Show toast if message param is present
+  useEffect(() => {
+    if (params.message) {
+      setToastMessage(params.message);
+      setShowToast(true);
+    }
+  }, [params.message]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -175,6 +187,14 @@ export default function RemindersScreen() {
             </View>
           ) : null
         }
+      />
+
+      {/* Toast Notification */}
+      <Toast
+        message={toastMessage}
+        visible={showToast}
+        duration={2000}
+        onHide={() => setShowToast(false)}
       />
     </View>
   );
