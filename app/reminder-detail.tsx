@@ -35,8 +35,12 @@ export default function ReminderDetailScreen() {
   const { reminders, deleteReminder, updateReminderStatus } = useReminderStore();
 
   const [reminder, setReminder] = useState<Reminder | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    // Don't show "not found" error if we're in the process of deleting
+    if (isDeleting) return;
+
     const found = reminders.find((r) => r.id === params.id);
     if (found) {
       setReminder(found);
@@ -46,7 +50,7 @@ export default function ReminderDetailScreen() {
         { text: 'OK', onPress: () => router.back() },
       ]);
     }
-  }, [params.id, reminders]);
+  }, [params.id, reminders, isDeleting]);
 
   const handleDelete = () => {
     if (!reminder) return;
@@ -61,9 +65,11 @@ export default function ReminderDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              setIsDeleting(true);
               await deleteReminder(reminder.id);
               router.back();
             } catch (error) {
+              setIsDeleting(false);
               Alert.alert('Error', 'Failed to delete reminder');
             }
           },
