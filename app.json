@@ -10,7 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ibnuj.until"
+      "bundleIdentifier": "com.ibnuj.until",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow Until to recognize your speech for voice reminders",
+        "NSMicrophoneUsageDescription": "Allow Until to record your voice for creating reminders"
+      },
+      "appleTeamId": "8T443QR2WK"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +25,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.ibnuj.until"
     },
     "web": {
       "output": "static",
@@ -40,7 +49,14 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "@jamsch/expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Until to record your voice for creating reminders",
+          "speechRecognitionPermission": "Allow Until to recognize your speech for voice reminders"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
