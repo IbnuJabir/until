@@ -33,6 +33,7 @@ import {
   Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Toast } from '@/app/src/utils/Toast';
 
 export default function CreateReminderScreen() {
   const router = useRouter();
@@ -60,6 +61,10 @@ export default function CreateReminderScreen() {
   const [tempActivationDateTime, setTempActivationDateTime] = useState<Date>(new Date());
   const [showActivationDatePicker, setShowActivationDatePicker] = useState(false);
   const [showActivationTimePicker, setShowActivationTimePicker] = useState(false);
+
+  // Toast state
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
 
   const isPro = entitlements.hasProAccess;
 
@@ -478,12 +483,14 @@ export default function CreateReminderScreen() {
       // Save to store (which persists to database)
       await addReminder(reminder);
 
-      Alert.alert('Success', 'Reminder created!', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]);
+      // Show success toast
+      setToastMessage('Reminder created!');
+      setShowToast(true);
+
+      // Navigate back after a short delay to show the toast
+      setTimeout(() => {
+        router.back();
+      }, 800);
     } catch (error) {
       Alert.alert(
         'Error',
@@ -911,6 +918,14 @@ export default function CreateReminderScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Toast Notification */}
+      <Toast
+        message={toastMessage}
+        visible={showToast}
+        duration={2000}
+        onHide={() => setShowToast(false)}
+      />
     </View>
   );
 }

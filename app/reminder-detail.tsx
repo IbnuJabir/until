@@ -28,6 +28,7 @@ import {
   TimeWindowConfig,
 } from '@/app/src/domain';
 import { format } from 'date-fns';
+import { Toast } from '@/app/src/utils/Toast';
 
 export default function ReminderDetailScreen() {
   const router = useRouter();
@@ -36,6 +37,8 @@ export default function ReminderDetailScreen() {
 
   const [reminder, setReminder] = useState<Reminder | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
     // Don't show "not found" error if we're in the process of deleting
@@ -67,7 +70,12 @@ export default function ReminderDetailScreen() {
             try {
               setIsDeleting(true);
               await deleteReminder(reminder.id);
-              router.back();
+              setToastMessage('Reminder deleted');
+              setShowToast(true);
+              // Delay navigation to show toast
+              setTimeout(() => {
+                router.back();
+              }, 500);
             } catch (error) {
               setIsDeleting(false);
               Alert.alert('Error', 'Failed to delete reminder');
@@ -83,7 +91,8 @@ export default function ReminderDetailScreen() {
 
     try {
       await updateReminderStatus(reminder.id, ReminderStatus.WAITING);
-      Alert.alert('Success', 'Reminder reactivated');
+      setToastMessage('Reminder reactivated');
+      setShowToast(true);
     } catch (error) {
       Alert.alert('Error', 'Failed to reactivate reminder');
     }
@@ -301,6 +310,14 @@ export default function ReminderDetailScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Toast Notification */}
+      <Toast
+        message={toastMessage}
+        visible={showToast}
+        duration={2000}
+        onHide={() => setShowToast(false)}
+      />
     </View>
   );
 }
