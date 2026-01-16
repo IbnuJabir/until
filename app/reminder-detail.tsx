@@ -17,7 +17,16 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useReminderStore } from '@/app/src/store/reminderStore';
-import { Reminder, TriggerType, ReminderStatus } from '@/app/src/domain';
+import {
+  Reminder,
+  TriggerType,
+  ReminderStatus,
+  TriggerConfig,
+  ScheduledTimeConfig,
+  LocationConfig,
+  AppOpenedConfig,
+  TimeWindowConfig,
+} from '@/app/src/domain';
 import { format } from 'date-fns';
 
 export default function ReminderDetailScreen() {
@@ -78,6 +87,8 @@ export default function ReminderDetailScreen() {
     switch (type) {
       case TriggerType.TIME_WINDOW:
         return '⏰';
+      case TriggerType.SCHEDULED_TIME:
+        return '⏰';
       case TriggerType.PHONE_UNLOCK:
         return '📱';
       case TriggerType.LOCATION_ENTER:
@@ -95,6 +106,8 @@ export default function ReminderDetailScreen() {
     switch (type) {
       case TriggerType.TIME_WINDOW:
         return 'Time Window';
+      case TriggerType.SCHEDULED_TIME:
+        return 'At a specific time';
       case TriggerType.PHONE_UNLOCK:
         return 'Phone Unlock';
       case TriggerType.LOCATION_ENTER:
@@ -105,6 +118,32 @@ export default function ReminderDetailScreen() {
         return 'App Opened';
       default:
         return 'Unknown';
+    }
+  };
+
+  const formatTriggerConfig = (type: TriggerType, config: TriggerConfig): string => {
+    if (!config) return '';
+
+    switch (type) {
+      case TriggerType.SCHEDULED_TIME: {
+        const scheduledConfig = config as ScheduledTimeConfig;
+        const date = new Date(scheduledConfig.scheduledDateTime);
+        return format(date, 'MMM d, yyyy \'at\' h:mm a');
+      }
+      case TriggerType.LOCATION_ENTER: {
+        const locationConfig = config as LocationConfig;
+        return `${locationConfig.name || 'Location'} (${locationConfig.radius}m)`;
+      }
+      case TriggerType.APP_OPENED: {
+        const appConfig = config as AppOpenedConfig;
+        return appConfig.appName;
+      }
+      case TriggerType.TIME_WINDOW: {
+        const timeConfig = config as TimeWindowConfig;
+        return `${timeConfig.startHour}:00 - ${timeConfig.endHour}:00`;
+      }
+      default:
+        return JSON.stringify(config, null, 2);
     }
   };
 
@@ -167,7 +206,7 @@ export default function ReminderDetailScreen() {
                 <Text style={styles.triggerLabel}>{getTriggerLabel(trigger.type)}</Text>
                 {trigger.config && (
                   <Text style={styles.triggerConfig}>
-                    {JSON.stringify(trigger.config, null, 2)}
+                    {formatTriggerConfig(trigger.type, trigger.config)}
                   </Text>
                 )}
               </View>
