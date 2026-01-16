@@ -67,6 +67,7 @@ export interface Trigger {
   id: string;
   type: TriggerType;
   config: TriggerConfig;
+  activationDateTime?: number; // Optional: Unix timestamp when trigger becomes active
 }
 
 // ============================================================================

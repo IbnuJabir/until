@@ -54,6 +54,13 @@ export default function CreateReminderScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
+  // Activation time state (for event-based triggers)
+  const [activationDate, setActivationDate] = useState<Date | null>(null);
+  const [activationTime, setActivationTime] = useState<Date | null>(null);
+  const [tempActivationDateTime, setTempActivationDateTime] = useState<Date>(new Date());
+  const [showActivationDatePicker, setShowActivationDatePicker] = useState(false);
+  const [showActivationTimePicker, setShowActivationTimePicker] = useState(false);
+
   const isPro = entitlements.hasProAccess;
 
   // Check if user has selected apps when component mounts
@@ -327,6 +334,78 @@ export default function CreateReminderScreen() {
     setTempDateTime(scheduledDateTime);
   };
 
+  // Activation date/time handlers
+  const handleActivationDateChange = (event: any, selectedDate?: Date) => {
+    if (selectedDate) {
+      setTempActivationDateTime(selectedDate);
+    }
+  };
+
+  const handleActivationTimeChange = (event: any, selectedTime?: Date) => {
+    if (selectedTime) {
+      const newDateTime = new Date(tempActivationDateTime);
+      newDateTime.setHours(selectedTime.getHours());
+      newDateTime.setMinutes(selectedTime.getMinutes());
+      setTempActivationDateTime(newDateTime);
+    }
+  };
+
+  const handleActivationDateConfirm = () => {
+    setActivationDate(tempActivationDateTime);
+    setShowActivationDatePicker(false);
+  };
+
+  const handleActivationTimeConfirm = () => {
+    setActivationTime(tempActivationDateTime);
+    setShowActivationTimePicker(false);
+  };
+
+  const handleActivationPickerCancel = () => {
+    setShowActivationDatePicker(false);
+    setShowActivationTimePicker(false);
+  };
+
+  const handleClearActivationTime = () => {
+    setActivationDate(null);
+    setActivationTime(null);
+  };
+
+  // Calculate activation datetime based on selected date and time
+  const calculateActivationDateTime = (): number | undefined => {
+    // If neither date nor time is selected, return undefined (immediate activation)
+    if (!activationDate && !activationTime) {
+      return undefined;
+    }
+
+    const now = new Date();
+    let result: Date;
+
+    if (activationDate && activationTime) {
+      // Both date and time selected: use the exact datetime
+      result = new Date(activationDate);
+      result.setHours(activationTime.getHours());
+      result.setMinutes(activationTime.getMinutes());
+      result.setSeconds(0);
+      result.setMilliseconds(0);
+    } else if (activationDate && !activationTime) {
+      // Only date selected: use start of that day (00:00)
+      result = new Date(activationDate);
+      result.setHours(0);
+      result.setMinutes(0);
+      result.setSeconds(0);
+      result.setMilliseconds(0);
+    } else {
+      // Only time selected: use today with that time
+      result = new Date(now);
+      result.setHours(activationTime!.getHours());
+      result.setMinutes(activationTime!.getMinutes());
+      result.setSeconds(0);
+      result.setMilliseconds(0);
+    }
+
+    return result.getTime();
+  };
+
   const handleCreate = async () => {
     // Validation
     if (!title.trim()) {
@@ -354,23 +433,31 @@ export default function CreateReminderScreen() {
     setIsCreating(true);
 
     try {
+      // Calculate activation datetime for event-based triggers
+      const activationDateTime = calculateActivationDateTime();
+
       // Create triggers with config for APP_OPENED, LOCATION_ENTER, and SCHEDULED_TIME
       const triggers = selectedTriggers.map((type) => {
         if (type === TriggerType.APP_OPENED) {
           // Screen Time API uses tokenized app identifiers (not bundle IDs)
           // Store a placeholder config - actual monitoring happens via native module
-          return createTrigger(type, {
-            bundleId: 'screentime.apps.selected',
-            appName: `${selectedAppCount} selected app${selectedAppCount > 1 ? 's' : ''}`,
-          });
+          return createTrigger(
+            type,
+            {
+              bundleId: 'screentime.apps.selected',
+              appName: `${selectedAppCount} selected app${selectedAppCount > 1 ? 's' : ''}`,
+            },
+            activationDateTime
+          );
         }
         if (type === TriggerType.LOCATION_ENTER && selectedLocation) {
-          return createTrigger(type, selectedLocation);
+          return createTrigger(type, selectedLocation, activationDateTime);
         }
         if (type === TriggerType.SCHEDULED_TIME) {
           return createScheduledTimeTrigger(scheduledDateTime.getTime());
         }
-        return createTrigger(type);
+        // For PHONE_UNLOCK and CHARGING_STARTED
+        return createTrigger(type, null, activationDateTime);
       });
 
       // Create reminder
@@ -548,6 +635,71 @@ export default function CreateReminderScreen() {
                   </Text>
                 </TouchableOpacity>
               )} */}
+
+              {/* Activation Time Section - Only show for event-based triggers */}
+              {selectedTriggers.length > 0 &&
+                !selectedTriggers.includes(TriggerType.SCHEDULED_TIME) && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>When should this trigger activate? (Optional)</Text>
+                    <Text style={styles.sectionHint}>
+                      Set a future date/time for when the trigger becomes active. Leave empty for immediate activation.
+                    </Text>
+
+                    <View style={styles.activationTimeContainer}>
+                      <TouchableOpacity
+                        style={styles.activationTimeButton}
+                        onPress={() => {
+                          setTempActivationDateTime(activationDate || new Date());
+                          setShowActivationDatePicker(true);
+                        }}
+                      >
+                        <Text style={styles.activationTimeButtonIcon}>📅</Text>
+                        <View style={styles.activationTimeButtonText}>
+                          <Text style={styles.activationTimeLabel}>Date</Text>
+                          <Text style={styles.activationTimeValue}>
+                            {activationDate
+                              ? activationDate.toLocaleDateString([], {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })
+                              : 'Not set'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.activationTimeButton}
+                        onPress={() => {
+                          setTempActivationDateTime(activationTime || new Date());
+                          setShowActivationTimePicker(true);
+                        }}
+                      >
+                        <Text style={styles.activationTimeButtonIcon}>⏰</Text>
+                        <View style={styles.activationTimeButtonText}>
+                          <Text style={styles.activationTimeLabel}>Time</Text>
+                          <Text style={styles.activationTimeValue}>
+                            {activationTime
+                              ? activationTime.toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : 'Not set'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+
+                    {(activationDate || activationTime) && (
+                      <TouchableOpacity
+                        style={styles.clearActivationButton}
+                        onPress={handleClearActivationTime}
+                      >
+                        <Text style={styles.clearActivationText}>Clear activation time</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -658,6 +810,99 @@ export default function CreateReminderScreen() {
                 <TouchableOpacity
                   style={styles.datePickerConfirmButton}
                   onPress={handleTimeConfirm}
+                >
+                  <Text style={styles.datePickerConfirmText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Activation Date Picker Modal */}
+      {showActivationDatePicker && (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showActivationDatePicker}
+          onRequestClose={handleActivationPickerCancel}
+        >
+          <View style={styles.datePickerOverlay}>
+            <TouchableOpacity
+              style={styles.datePickerBackdrop}
+              activeOpacity={1}
+              onPress={handleActivationPickerCancel}
+            />
+            <View style={styles.datePickerModal}>
+              <View style={styles.datePickerHeader}>
+                <Text style={styles.datePickerTitle}>Select Activation Date</Text>
+                <TouchableOpacity onPress={handleActivationPickerCancel}>
+                  <Text style={styles.datePickerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempActivationDateTime}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleActivationDateChange}
+                minimumDate={new Date()}
+              />
+              <View style={styles.datePickerButtons}>
+                <TouchableOpacity
+                  style={styles.datePickerCancelButton}
+                  onPress={handleActivationPickerCancel}
+                >
+                  <Text style={styles.datePickerCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.datePickerConfirmButton}
+                  onPress={handleActivationDateConfirm}
+                >
+                  <Text style={styles.datePickerConfirmText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Activation Time Picker Modal */}
+      {showActivationTimePicker && (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showActivationTimePicker}
+          onRequestClose={handleActivationPickerCancel}
+        >
+          <View style={styles.datePickerOverlay}>
+            <TouchableOpacity
+              style={styles.datePickerBackdrop}
+              activeOpacity={1}
+              onPress={handleActivationPickerCancel}
+            />
+            <View style={styles.datePickerModal}>
+              <View style={styles.datePickerHeader}>
+                <Text style={styles.datePickerTitle}>Select Activation Time</Text>
+                <TouchableOpacity onPress={handleActivationPickerCancel}>
+                  <Text style={styles.datePickerClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempActivationDateTime}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleActivationTimeChange}
+              />
+              <View style={styles.datePickerButtons}>
+                <TouchableOpacity
+                  style={styles.datePickerCancelButton}
+                  onPress={handleActivationPickerCancel}
+                >
+                  <Text style={styles.datePickerCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.datePickerConfirmButton}
+                  onPress={handleActivationTimeConfirm}
                 >
                   <Text style={styles.datePickerConfirmText}>Confirm</Text>
                 </TouchableOpacity>
@@ -1017,5 +1262,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  // Activation Time Styles
+  activationTimeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  activationTimeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  activationTimeButtonIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  activationTimeButtonText: {
+    flex: 1,
+  },
+  activationTimeLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  activationTimeValue: {
+    fontSize: 16,
+    color: '#000',
+    fontWeight: '500',
+  },
+  clearActivationButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  clearActivationText: {
+    fontSize: 14,
+    color: '#FF3B30',
+    fontWeight: '600',
   },
 });

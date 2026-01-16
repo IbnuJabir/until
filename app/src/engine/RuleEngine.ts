@@ -149,6 +149,12 @@ export function doesTriggerMatchEvent(
   event: SystemEvent
 ): boolean {
   return reminder.triggers.some((trigger) => {
+    // Check if trigger has an activation time and if it's not yet active
+    if (trigger.activationDateTime && event.timestamp < trigger.activationDateTime) {
+      console.log(`[RuleEngine] Trigger not yet active. Activation time: ${new Date(trigger.activationDateTime).toLocaleString()}, Current time: ${new Date(event.timestamp).toLocaleString()}`);
+      return false;
+    }
+
     switch (event.type) {
       case SystemEventType.APP_BECAME_ACTIVE:
         return trigger.type === TriggerType.PHONE_UNLOCK;

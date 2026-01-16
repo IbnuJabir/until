@@ -48,12 +48,14 @@ export function createReminder(
  */
 export function createTrigger(
   type: TriggerType,
-  config: TriggerConfig = null
+  config: TriggerConfig = null,
+  activationDateTime?: number
 ): Trigger {
   return {
     id: generateId(),
     type,
     config,
+    activationDateTime,
   };
 }
 

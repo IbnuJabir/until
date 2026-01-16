@@ -209,6 +209,16 @@ export default function ReminderDetailScreen() {
                     {formatTriggerConfig(trigger.type, trigger.config)}
                   </Text>
                 )}
+                {trigger.activationDateTime && (
+                  <Text style={styles.triggerActivation}>
+                    Active from: {format(trigger.activationDateTime, 'MMM d, yyyy \'at\' h:mm a')}
+                  </Text>
+                )}
+                {!trigger.activationDateTime && trigger.type !== 'SCHEDULED_TIME' && (
+                  <Text style={styles.triggerActivation}>
+                    Active immediately
+                  </Text>
+                )}
               </View>
             </View>
           ))}
@@ -398,6 +408,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontFamily: 'monospace',
+  },
+  triggerActivation: {
+    fontSize: 11,
+    color: '#007AFF',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   conditionCard: {
     backgroundColor: '#FFF9E6',
