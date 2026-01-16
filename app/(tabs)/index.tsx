@@ -160,12 +160,20 @@ export default function RemindersScreen() {
             {activeReminders.length} active
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={handleCreateReminder}
-        >
-          <Text style={styles.createButtonText}>+ New</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.voiceButton}
+            onPress={() => router.push('/voice-reminder' as any)}
+          >
+            <Text style={styles.voiceButtonText}>🎤</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={handleCreateReminder}
+          >
+            <Text style={styles.createButtonText}>+ New</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Reminder List */}
@@ -235,6 +243,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  voiceButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  voiceButtonText: {
+    fontSize: 20,
   },
   listContent: {
     padding: 16,
