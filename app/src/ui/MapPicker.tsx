@@ -15,6 +15,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import MapView, { Marker, Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import {
   getCurrentLocation,
@@ -22,6 +23,7 @@ import {
   getLocationPermissionStatus,
 } from '../native-bridge/LocationBridge';
 import { LocationConfig } from '../domain/types';
+import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 
 interface MapPickerProps {
   visible: boolean;
@@ -168,12 +170,12 @@ export default function MapPicker({
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-            <Text style={styles.cancelText}>Cancel</Text>
+          <TouchableOpacity onPress={handleCancel} style={styles.cancelButton} activeOpacity={0.7}>
+            <MaterialIcons name="close" size={24} color={WarmColors.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Select Location</Text>
-          <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-            <Text style={styles.saveText}>Save</Text>
+          <TouchableOpacity onPress={handleSave} style={styles.saveButton} activeOpacity={0.7}>
+            <MaterialIcons name="check" size={24} color={WarmColors.primary} />
           </TouchableOpacity>
         </View>
 
@@ -181,7 +183,7 @@ export default function MapPicker({
         <View style={styles.mapContainer}>
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#007AFF" />
+              <ActivityIndicator size="large" color={WarmColors.primary} />
               <Text style={styles.loadingText}>Loading map...</Text>
             </View>
           ) : (
@@ -211,8 +213,8 @@ export default function MapPicker({
                   <Circle
                     center={selectedLocation}
                     radius={radius}
-                    fillColor="rgba(0, 122, 255, 0.2)"
-                    strokeColor="rgba(0, 122, 255, 0.8)"
+                    fillColor={`${WarmColors.primary}30`}
+                    strokeColor={WarmColors.primary}
                     strokeWidth={2}
                   />
                 </>
@@ -237,21 +239,34 @@ export default function MapPicker({
 
           {/* Radius Control */}
           <View style={styles.radiusContainer}>
-            <Text style={styles.radiusLabel}>Detection Radius: {radius}m</Text>
+            <View style={styles.radiusHeader}>
+              <MaterialIcons name="radio-button-unchecked" size={16} color={WarmColors.primary} />
+              <Text style={styles.radiusLabel}>Detection Radius: {radius}m</Text>
+            </View>
             <View style={styles.radiusButtons}>
               <TouchableOpacity
                 style={[styles.radiusButton, radius <= MIN_RADIUS && styles.radiusButtonDisabled]}
                 onPress={decreaseRadius}
                 disabled={radius <= MIN_RADIUS}
+                activeOpacity={0.7}
               >
-                <Text style={styles.radiusButtonText}>-</Text>
+                <MaterialIcons 
+                  name="remove" 
+                  size={20} 
+                  color={radius <= MIN_RADIUS ? WarmColors.textTertiary : WarmColors.textOnPrimary} 
+                />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.radiusButton, radius >= MAX_RADIUS && styles.radiusButtonDisabled]}
                 onPress={increaseRadius}
                 disabled={radius >= MAX_RADIUS}
+                activeOpacity={0.7}
               >
-                <Text style={styles.radiusButtonText}>+</Text>
+                <MaterialIcons 
+                  name="add" 
+                  size={20} 
+                  color={radius >= MAX_RADIUS ? WarmColors.textTertiary : WarmColors.textOnPrimary} 
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -268,7 +283,12 @@ export default function MapPicker({
               <Text style={styles.coordsText}>
                 {selectedLocation.latitude.toFixed(6)}, {selectedLocation.longitude.toFixed(6)}
               </Text>
-              <TouchableOpacity onPress={loadCurrentLocation} style={styles.currentLocationButton}>
+              <TouchableOpacity 
+                onPress={loadCurrentLocation} 
+                style={styles.currentLocationButton}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="my-location" size={18} color={WarmColors.primary} />
                 <Text style={styles.currentLocationText}>Use Current Location</Text>
               </TouchableOpacity>
             </View>
@@ -282,39 +302,37 @@ export default function MapPicker({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: WarmColors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 20,
-    paddingBottom: 16,
+    paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: WarmColors.border,
+    backgroundColor: WarmColors.background,
+    ...Elevation.level1,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    ...Typography.h4,
+    color: WarmColors.textPrimary,
   },
   cancelButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  cancelText: {
-    fontSize: 16,
-    color: '#007AFF',
+    paddingVertical: Spacing.xs,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   saveButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  saveText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    paddingVertical: Spacing.xs,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mapContainer: {
     flex: 1,
@@ -326,85 +344,95 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: Spacing.md,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+    ...Typography.body,
+    color: WarmColors.textSecondary,
   },
   controls: {
-    padding: 20,
-    backgroundColor: '#f8f8f8',
+    padding: Spacing.md,
+    backgroundColor: WarmColors.surfaceVariant,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: WarmColors.border,
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: Spacing.md,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
+    ...Typography.caption,
+    color: WarmColors.textPrimary,
+    marginBottom: Spacing.sm,
+    fontWeight: '600',
   },
   textInput: {
-    backgroundColor: '#fff',
+    backgroundColor: WarmColors.background,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    borderColor: WarmColors.border,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    ...Typography.body,
+    color: WarmColors.textPrimary,
   },
   radiusContainer: {
-    marginBottom: 16,
+    marginBottom: Spacing.md,
+  },
+  radiusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   radiusLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
+    ...Typography.caption,
+    color: WarmColors.textPrimary,
+    fontWeight: '600',
   },
   radiusButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: Spacing.md,
   },
   radiusButton: {
     flex: 1,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 12,
+    backgroundColor: WarmColors.primary,
+    borderRadius: BorderRadius.sm,
+    paddingVertical: Spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
+    ...Elevation.level1,
   },
   radiusButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  radiusButtonText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#fff',
+    backgroundColor: WarmColors.textTertiary,
   },
   instructionText: {
-    fontSize: 14,
-    color: '#666',
+    ...Typography.caption,
+    color: WarmColors.textSecondary,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: Spacing.sm,
   },
   coordsContainer: {
     alignItems: 'center',
+    marginTop: Spacing.sm,
   },
   coordsText: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 8,
+    ...Typography.small,
+    color: WarmColors.textTertiary,
+    marginBottom: Spacing.sm,
+    fontFamily: 'monospace',
   },
   currentLocationButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: `${WarmColors.primary}15`,
+    borderRadius: BorderRadius.sm,
   },
   currentLocationText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
+    ...Typography.caption,
+    color: WarmColors.primary,
+    fontWeight: '600',
   },
 });

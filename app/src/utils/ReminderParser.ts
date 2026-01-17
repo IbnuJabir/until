@@ -223,7 +223,10 @@ export function getTriggerDescription(trigger: ParsedTrigger): string {
         return `When you arrive at ${trigger.locationQuery}`;
       }
       if (trigger.config?.name) {
-        return `When you arrive at ${trigger.config.name}`;
+        // Check if it's a placeholder location (needs editing)
+        const isPlaceholder = trigger.config.name.includes('(Edit location)');
+        const prefix = isPlaceholder ? '⚠️ ' : '';
+        return `${prefix}When you arrive at ${trigger.config.name}`;
       }
       return 'When you arrive at location';
 
@@ -238,7 +241,10 @@ export function getTriggerDescription(trigger: ParsedTrigger): string {
         return `When you open ${trigger.appQuery}`;
       }
       if (trigger.config?.appName) {
-        return `When you open ${trigger.config.appName}`;
+        // Check if it's a placeholder app (needs selection)
+        const isPlaceholder = trigger.config.appName.includes('(Select app)');
+        const prefix = isPlaceholder ? '⚠️ ' : '';
+        return `${prefix}When you open ${trigger.config.appName}`;
       }
       return 'When you open app';
 

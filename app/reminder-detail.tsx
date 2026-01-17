@@ -16,6 +16,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import {
   Reminder,
@@ -29,6 +30,7 @@ import {
 } from '@/app/src/domain';
 import { format } from 'date-fns';
 import { Toast } from '@/app/src/utils/Toast';
+import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 
 export default function ReminderDetailScreen() {
   const router = useRouter();
@@ -95,22 +97,21 @@ export default function ReminderDetailScreen() {
     }
   };
 
-  const getTriggerIcon = (type: TriggerType): string => {
+  const getTriggerIcon = (type: TriggerType): keyof typeof MaterialIcons.glyphMap => {
     switch (type) {
       case TriggerType.TIME_WINDOW:
-        return '⏰';
       case TriggerType.SCHEDULED_TIME:
-        return '⏰';
+        return 'schedule';
       case TriggerType.PHONE_UNLOCK:
-        return '📱';
+        return 'smartphone';
       case TriggerType.LOCATION_ENTER:
-        return '📍';
+        return 'location-on';
       case TriggerType.CHARGING_STARTED:
-        return '🔋';
+        return 'battery-charging-full';
       case TriggerType.APP_OPENED:
-        return '📲';
+        return 'apps';
       default:
-        return '🔔';
+        return 'notifications';
     }
   };
 
@@ -168,6 +169,7 @@ export default function ReminderDetailScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.loadingContainer}>
+          <MaterialIcons name="hourglass-empty" size={48} color={WarmColors.textTertiary} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </View>
@@ -180,11 +182,12 @@ export default function ReminderDetailScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+          <MaterialIcons name="arrow-back" size={24} color={WarmColors.primary} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
-          <Text style={styles.deleteButtonText}>Delete</Text>
+        <Text style={styles.headerTitle}>Reminder Details</Text>
+        <TouchableOpacity onPress={handleDelete} style={styles.deleteButton} activeOpacity={0.7}>
+          <MaterialIcons name="delete-outline" size={24} color={WarmColors.error} />
         </TouchableOpacity>
       </View>
 
@@ -192,7 +195,8 @@ export default function ReminderDetailScreen() {
         {/* Status Badge */}
         {isFired && (
           <View style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText}>✓ Fired</Text>
+            <MaterialIcons name="check-circle" size={16} color={WarmColors.textOnPrimary} />
+            <Text style={styles.statusBadgeText}>Fired</Text>
           </View>
         )}
 
@@ -213,7 +217,13 @@ export default function ReminderDetailScreen() {
           </Text>
           {reminder.triggers.map((trigger) => (
             <View key={trigger.id} style={styles.triggerCard}>
-              <Text style={styles.triggerIcon}>{getTriggerIcon(trigger.type)}</Text>
+              <View style={styles.triggerIconContainer}>
+                <MaterialIcons 
+                  name={getTriggerIcon(trigger.type)} 
+                  size={24} 
+                  color={WarmColors.primary} 
+                />
+              </View>
               <View style={styles.triggerDetails}>
                 <Text style={styles.triggerLabel}>{getTriggerLabel(trigger.type)}</Text>
                 {trigger.config && (
@@ -302,7 +312,9 @@ export default function ReminderDetailScreen() {
           <TouchableOpacity
             style={styles.reactivateButton}
             onPress={handleMarkAsWaiting}
+            activeOpacity={0.8}
           >
+            <MaterialIcons name="refresh" size={20} color={WarmColors.textOnPrimary} />
             <Text style={styles.reactivateButtonText}>Reactivate Reminder</Text>
           </TouchableOpacity>
         )}
@@ -322,175 +334,187 @@ export default function ReminderDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: WarmColors.backgroundLight,
   },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: WarmColors.background,
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: WarmColors.border,
+    ...Elevation.level1,
   },
   backButton: {
-    paddingVertical: 8,
+    paddingVertical: Spacing.xs,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  backButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
+  headerTitle: {
+    ...Typography.h4,
+    color: WarmColors.textPrimary,
   },
   deleteButton: {
-    paddingVertical: 8,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    color: '#FF3B30',
-    fontWeight: '500',
+    paddingVertical: Spacing.xs,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: Spacing.md,
   },
   loadingText: {
-    fontSize: 16,
-    color: '#666',
+    ...Typography.body,
+    color: WarmColors.textSecondary,
   },
   content: {
     flex: 1,
   },
   contentContainer: {
-    padding: 20,
+    padding: Spacing.md,
   },
   statusBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: WarmColors.success,
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 16,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    marginBottom: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
   },
   statusBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    ...Typography.caption,
+    color: WarmColors.textOnPrimary,
     fontWeight: '600',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 12,
+    ...Typography.h2,
+    color: WarmColors.textPrimary,
+    marginBottom: Spacing.md,
   },
   description: {
-    fontSize: 16,
-    color: '#666',
+    ...Typography.body,
+    color: WarmColors.textSecondary,
     lineHeight: 24,
   },
   section: {
-    marginTop: 24,
+    marginTop: Spacing.lg,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+    ...Typography.h4,
+    color: WarmColors.textPrimary,
+    marginBottom: Spacing.md,
   },
   triggerCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: WarmColors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: WarmColors.border,
+    ...Elevation.level2,
   },
-  triggerIcon: {
-    fontSize: 32,
-    marginRight: 16,
+  triggerIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: `${WarmColors.primary}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
   },
   triggerDetails: {
     flex: 1,
   },
   triggerLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
+    ...Typography.bodyBold,
+    color: WarmColors.textPrimary,
+    marginBottom: Spacing.xs,
   },
   triggerConfig: {
-    fontSize: 12,
-    color: '#666',
+    ...Typography.small,
+    color: WarmColors.textSecondary,
     fontFamily: 'monospace',
+    marginTop: Spacing.xs,
   },
   triggerActivation: {
-    fontSize: 11,
-    color: '#007AFF',
-    marginTop: 4,
+    ...Typography.small,
+    color: WarmColors.primary,
+    marginTop: Spacing.xs,
     fontStyle: 'italic',
   },
   conditionCard: {
-    backgroundColor: '#FFF9E6',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    backgroundColor: `${WarmColors.accent}20`,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
+    borderLeftColor: WarmColors.accent,
   },
   conditionType: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
+    ...Typography.caption,
+    color: WarmColors.textPrimary,
+    marginBottom: Spacing.xs,
   },
   conditionConfig: {
-    fontSize: 12,
-    color: '#666',
+    ...Typography.small,
+    color: WarmColors.textSecondary,
     fontFamily: 'monospace',
   },
   metadataRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: WarmColors.border,
   },
   metadataLabel: {
-    fontSize: 14,
-    color: '#666',
+    ...Typography.body,
+    color: WarmColors.textSecondary,
     fontWeight: '500',
   },
   metadataValue: {
-    fontSize: 14,
-    color: '#000',
+    ...Typography.body,
+    color: WarmColors.textPrimary,
     flex: 1,
     textAlign: 'right',
   },
   firedText: {
-    color: '#4CAF50',
+    color: WarmColors.success,
     fontWeight: '600',
   },
   idText: {
-    fontSize: 10,
+    ...Typography.small,
     fontFamily: 'monospace',
+    fontSize: 10,
   },
   reactivateButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: WarmColors.primary,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 40,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.xl,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    ...Elevation.level2,
   },
   reactivateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    ...Typography.bodyBold,
+    color: WarmColors.textOnPrimary,
   },
 });

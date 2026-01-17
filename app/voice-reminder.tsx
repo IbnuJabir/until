@@ -14,8 +14,10 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -25,6 +27,7 @@ import { parseVoiceReminder, getTriggerDescription, getActivationDescription } f
 import type { ParsedReminder, ParsedTrigger } from '@/app/src/utils/ReminderParser';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import { createReminder, createTrigger, TriggerType } from '@/app/src/domain';
+import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 
 export default function VoiceReminderScreen() {
   const router = useRouter();
@@ -35,6 +38,7 @@ export default function VoiceReminderScreen() {
   const [parsedReminder, setParsedReminder] = useState<ParsedReminder | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pulseAnim] = useState(new Animated.Value(1));
 
   // Listen for speech recognition results
   useSpeechRecognitionEvent('result', (event) => {
@@ -94,6 +98,22 @@ export default function VoiceReminderScreen() {
       setTranscript('');
       setParsedReminder(null);
       setError(null);
+      
+      // Start pulse animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.15,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
     } catch (err: any) {
       console.error('[VoiceReminder] Failed to start speech recognition:', err);
 
@@ -114,6 +134,8 @@ export default function VoiceReminderScreen() {
     try {
       await ExpoSpeechRecognitionModule.stop();
       setIsListening(false);
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
     } catch (err) {
       console.error('[VoiceReminder] Failed to stop speech recognition:', err);
     }
@@ -143,14 +165,18 @@ export default function VoiceReminderScreen() {
       );
     }
 
-    // Location not found - show alert
-    Alert.alert(
-      'Location Not Found',
-      `I couldn't find "${trigger.locationQuery}" in your saved places. Please add it manually.`,
-      [{ text: 'OK' }]
+    // Location not found - create placeholder that user can edit later
+    console.log(`[VoiceReminder] Location "${trigger.locationQuery}" not found, creating placeholder`);
+    return createTrigger(
+      TriggerType.LOCATION_ENTER,
+      {
+        latitude: 0,
+        longitude: 0,
+        radius: 100,
+        name: `${trigger.locationQuery} (Edit location)`,
+      },
+      trigger.activationDateTime
     );
-
-    return null;
   };
 
   const createReminderFromVoice = async () => {
@@ -175,13 +201,18 @@ export default function VoiceReminderScreen() {
             continue;
           }
         } else if (parsedTrigger.type === TriggerType.APP_OPENED) {
-          // For MVP, skip app triggers (need app selection UI)
-          Alert.alert(
-            'App Trigger Not Supported Yet',
-            'App-based triggers will be available in a future update. Your reminder will be created without this trigger.',
-            [{ text: 'OK' }]
+          // Create placeholder app trigger - user can select actual app later
+          console.log(`[VoiceReminder] Creating placeholder app trigger for "${parsedTrigger.appQuery}"`);
+          triggers.push(
+            createTrigger(
+              TriggerType.APP_OPENED,
+              {
+                bundleId: 'unknown',
+                appName: `${parsedTrigger.appQuery || 'Unknown App'} (Select app)`,
+              },
+              parsedTrigger.activationDateTime
+            )
           );
-          continue;
         } else {
           // Other triggers (scheduled time, charging, unlock)
           triggers.push(
@@ -230,7 +261,7 @@ export default function VoiceReminderScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Cancel</Text>
+          <MaterialIcons name="arrow-back" size={24} color={WarmColors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Voice Reminder</Text>
         <View style={styles.backButton} />
@@ -252,13 +283,20 @@ export default function VoiceReminderScreen() {
 
         {/* Microphone Button */}
         <View style={styles.micContainer}>
-          <TouchableOpacity
-            style={[styles.micButton, isListening && styles.micButtonActive]}
-            onPress={isListening ? stopListening : startListening}
-            disabled={isCreating}
-          >
-            <Text style={styles.micIcon}>{isListening ? '🔴' : '🎤'}</Text>
-          </TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: isListening ? pulseAnim : 1 }] }}>
+            <TouchableOpacity
+              style={[styles.micButton, isListening && styles.micButtonActive]}
+              onPress={isListening ? stopListening : startListening}
+              disabled={isCreating}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons 
+                name={isListening ? 'mic' : 'mic-none'} 
+                size={48} 
+                color={WarmColors.textOnPrimary} 
+              />
+            </TouchableOpacity>
+          </Animated.View>
           <Text style={styles.micHint}>
             {isListening ? 'Listening... Tap to stop' : 'Tap to start recording'}
           </Text>
@@ -290,7 +328,7 @@ export default function VoiceReminderScreen() {
                 <Text style={styles.triggersLabel}>Triggers:</Text>
                 {parsedReminder.triggers.map((trigger, idx) => (
                   <View key={idx} style={styles.triggerItem}>
-                    <Text style={styles.triggerBullet}>•</Text>
+                    <MaterialIcons name="check-circle" size={16} color={WarmColors.primary} />
                     <Text style={styles.triggerText}>
                       {getTriggerDescription(trigger)}
                     </Text>
@@ -301,8 +339,9 @@ export default function VoiceReminderScreen() {
 
             {parsedReminder.confidence < 0.7 && (
               <View style={styles.lowConfidenceWarning}>
+                <MaterialIcons name="warning" size={16} color={WarmColors.warning} />
                 <Text style={styles.lowConfidenceText}>
-                  ⚠️ I'm not entirely sure I understood correctly. Please review before creating.
+                  I'm not entirely sure I understood correctly. Please review before creating.
                 </Text>
               </View>
             )}
@@ -315,11 +354,15 @@ export default function VoiceReminderScreen() {
               ]}
               onPress={createReminderFromVoice}
               disabled={isCreating || parsedReminder.triggers.length === 0}
+              activeOpacity={0.8}
             >
               {isCreating ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={WarmColors.textOnPrimary} />
               ) : (
-                <Text style={styles.createButtonText}>Create Reminder</Text>
+                <>
+                  <MaterialIcons name="check-circle" size={20} color={WarmColors.textOnPrimary} />
+                  <Text style={styles.createButtonText}>Create Reminder</Text>
+                </>
               )}
             </TouchableOpacity>
 
@@ -338,197 +381,194 @@ export default function VoiceReminderScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: WarmColors.backgroundLight,
   },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: WarmColors.background,
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: WarmColors.border,
+    ...Elevation.level1,
   },
   backButton: {
-    paddingVertical: 8,
+    paddingVertical: Spacing.xs,
     width: 80,
+    alignItems: 'flex-start',
   },
   backButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
+    ...Typography.body,
+    color: WarmColors.primary,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    ...Typography.h4,
+    color: WarmColors.textPrimary,
   },
   content: {
     flex: 1,
   },
   contentContainer: {
-    padding: 20,
+    padding: Spacing.md,
   },
   instructionsContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
+    backgroundColor: WarmColors.background,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    ...Elevation.level2,
   },
   instructionsTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 12,
+    ...Typography.h3,
+    color: WarmColors.textPrimary,
+    marginBottom: Spacing.md,
   },
   instructionsText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-    marginTop: 8,
+    ...Typography.caption,
+    color: WarmColors.textSecondary,
+    marginBottom: Spacing.md,
+    marginTop: Spacing.xs,
   },
   exampleText: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 6,
+    ...Typography.caption,
+    color: WarmColors.primary,
+    marginBottom: Spacing.sm,
     fontStyle: 'italic',
   },
   micContainer: {
     alignItems: 'center',
-    marginVertical: 32,
+    marginVertical: Spacing.xl,
   },
   micButton: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#007AFF',
+    backgroundColor: WarmColors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    ...Elevation.level4,
   },
   micButtonActive: {
-    backgroundColor: '#FF3B30',
-  },
-  micIcon: {
-    fontSize: 48,
+    backgroundColor: WarmColors.secondary,
   },
   micHint: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 16,
+    ...Typography.caption,
+    color: WarmColors.textSecondary,
+    marginTop: Spacing.md,
     textAlign: 'center',
   },
   errorContainer: {
-    backgroundColor: '#FFEBEE',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    backgroundColor: `${WarmColors.error}15`,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   errorText: {
-    fontSize: 14,
-    color: '#C62828',
+    ...Typography.caption,
+    color: WarmColors.error,
     textAlign: 'center',
+    flex: 1,
   },
   transcriptContainer: {
-    backgroundColor: '#F0F0F0',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: WarmColors.surfaceVariant,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    ...Elevation.level1,
   },
   transcriptLabel: {
-    fontSize: 12,
-    color: '#666',
+    ...Typography.small,
+    color: WarmColors.textSecondary,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   transcript: {
-    fontSize: 16,
-    color: '#000',
+    ...Typography.body,
+    color: WarmColors.textPrimary,
     lineHeight: 24,
   },
   parsedContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: WarmColors.background,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    ...Elevation.level3,
   },
   parsedLabel: {
-    fontSize: 12,
-    color: '#666',
+    ...Typography.small,
+    color: WarmColors.textSecondary,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   parsedTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 16,
+    ...Typography.h3,
+    color: WarmColors.textPrimary,
+    marginBottom: Spacing.md,
   },
   triggersLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    marginTop: 8,
+    ...Typography.bodyBold,
+    color: WarmColors.textPrimary,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
   },
   triggerItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  triggerBullet: {
-    fontSize: 16,
-    color: '#007AFF',
-    marginRight: 8,
-    marginTop: 2,
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
   },
   triggerText: {
-    fontSize: 14,
-    color: '#007AFF',
+    ...Typography.body,
+    color: WarmColors.primary,
     flex: 1,
   },
   lowConfidenceWarning: {
-    backgroundColor: '#FFF3CD',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-    marginBottom: 8,
+    backgroundColor: `${WarmColors.warning}20`,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   lowConfidenceText: {
-    fontSize: 12,
-    color: '#856404',
+    ...Typography.small,
+    color: WarmColors.warning,
+    flex: 1,
   },
   createButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: WarmColors.primary,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: Spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    ...Elevation.level2,
   },
   createButtonDisabled: {
-    backgroundColor: '#CCCCCC',
+    backgroundColor: WarmColors.textTertiary,
   },
   createButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    ...Typography.bodyBold,
+    color: WarmColors.textOnPrimary,
   },
   noTriggersHint: {
-    fontSize: 12,
-    color: '#666',
+    ...Typography.small,
+    color: WarmColors.textSecondary,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: Spacing.sm,
     fontStyle: 'italic',
   },
 });

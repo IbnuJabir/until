@@ -32,6 +32,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 
 export default function CreateReminderScreen() {
   const router = useRouter();
@@ -73,31 +75,31 @@ export default function CreateReminderScreen() {
     {
       type: TriggerType.SCHEDULED_TIME,
       label: 'At a specific time',
-      icon: '⏰',
+      icon: 'schedule' as keyof typeof MaterialIcons.glyphMap,
       isPro: false, // Free feature
     },
     {
       type: TriggerType.PHONE_UNLOCK,
       label: 'When I unlock my phone',
-      icon: '📱',
+      icon: 'smartphone' as keyof typeof MaterialIcons.glyphMap,
       isPro: false, // Free for testing
     },
     {
       type: TriggerType.CHARGING_STARTED,
       label: 'When I start charging',
-      icon: '🔌',
+      icon: 'battery-charging-full' as keyof typeof MaterialIcons.glyphMap,
       isPro: false, // TEMP: Disabled for testing (was: true)
     },
     {
       type: TriggerType.LOCATION_ENTER,
       label: 'When I arrive somewhere',
-      icon: '📍',
+      icon: 'location-on' as keyof typeof MaterialIcons.glyphMap,
       isPro: false, // TEMP: Disabled for testing (was: true)
     },
     {
       type: TriggerType.APP_OPENED,
       label: 'When I open an app',
-      icon: '📲',
+      icon: 'apps' as keyof typeof MaterialIcons.glyphMap,
       isPro: false, // TEMP: Disabled for testing (was: true)
     },
   ];
@@ -568,41 +570,59 @@ export default function CreateReminderScreen() {
                       disabled={screenTime.isLoading}
                     >
                       <View style={styles.triggerLeft}>
-                        <Text style={styles.triggerIcon}>{option.icon}</Text>
+                        <View style={[styles.triggerIconContainer, isSelected && styles.triggerIconContainerSelected]}>
+                          <MaterialIcons 
+                            name={option.icon} 
+                            size={24} 
+                            color={isSelected ? WarmColors.textOnPrimary : WarmColors.primary} 
+                          />
+                        </View>
                         <View style={styles.triggerTextContainer}>
                           <Text style={styles.triggerLabel}>{option.label}</Text>
                           {showAppCount && (
-                            <Text style={styles.selectedAppLabel}>
-                              {selectedAppCount} app{selectedAppCount > 1 ? 's' : ''} selected
-                            </Text>
+                            <View style={styles.selectedInfoContainer}>
+                              <MaterialIcons name="apps" size={12} color={WarmColors.primary} />
+                              <Text style={styles.selectedAppLabel}>
+                                {selectedAppCount} app{selectedAppCount > 1 ? 's' : ''} selected
+                              </Text>
+                            </View>
                           )}
                           {showLocationInfo && (
-                            <Text style={styles.selectedAppLabel}>
-                              {selectedLocation.name} ({selectedLocation.radius}m)
-                            </Text>
+                            <View style={styles.selectedInfoContainer}>
+                              <MaterialIcons name="location-on" size={12} color={WarmColors.primary} />
+                              <Text style={styles.selectedAppLabel}>
+                                {selectedLocation.name} ({selectedLocation.radius}m)
+                              </Text>
+                            </View>
                           )}
                           {showScheduledTime && (
-                            <Text style={styles.selectedAppLabel}>
-                              {scheduledDateTime.toLocaleDateString([], {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                              })} at {scheduledDateTime.toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </Text>
+                            <View style={styles.selectedInfoContainer}>
+                              <MaterialIcons name="schedule" size={12} color={WarmColors.primary} />
+                              <Text style={styles.selectedAppLabel}>
+                                {scheduledDateTime.toLocaleDateString([], {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })} at {scheduledDateTime.toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </Text>
+                            </View>
                           )}
                           {isLocked && (
-                            <Text style={styles.proLabel}>Pro Feature</Text>
+                            <View style={styles.selectedInfoContainer}>
+                              <MaterialIcons name="lock" size={12} color={WarmColors.accent} />
+                              <Text style={styles.proLabel}>Pro Feature</Text>
+                            </View>
                           )}
                         </View>
                       </View>
                       <View style={styles.triggerRight}>
                         {screenTime.isLoading && isAppTrigger ? (
-                          <ActivityIndicator size="small" />
+                          <ActivityIndicator size="small" color={WarmColors.primary} />
                         ) : isLocked ? (
-                          <Text style={styles.lockIcon}>🔒</Text>
+                          <MaterialIcons name="lock" size={20} color={WarmColors.textTertiary} />
                         ) : (
                           <View
                             style={[
@@ -610,7 +630,9 @@ export default function CreateReminderScreen() {
                               isSelected && styles.checkboxSelected,
                             ]}
                           >
-                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                            {isSelected && (
+                              <MaterialIcons name="check" size={16} color={WarmColors.textOnPrimary} />
+                            )}
                           </View>
                         )}
                       </View>
@@ -648,8 +670,11 @@ export default function CreateReminderScreen() {
                           setTempActivationDateTime(activationDate || new Date());
                           setShowActivationDatePicker(true);
                         }}
+                        activeOpacity={0.7}
                       >
-                        <Text style={styles.activationTimeButtonIcon}>📅</Text>
+                        <View style={styles.activationTimeIconContainer}>
+                          <MaterialIcons name="calendar-today" size={20} color={WarmColors.primary} />
+                        </View>
                         <View style={styles.activationTimeButtonText}>
                           <Text style={styles.activationTimeLabel}>Date</Text>
                           <Text style={styles.activationTimeValue}>
@@ -670,8 +695,11 @@ export default function CreateReminderScreen() {
                           setTempActivationDateTime(activationTime || new Date());
                           setShowActivationTimePicker(true);
                         }}
+                        activeOpacity={0.7}
                       >
-                        <Text style={styles.activationTimeButtonIcon}>⏰</Text>
+                        <View style={styles.activationTimeIconContainer}>
+                          <MaterialIcons name="access-time" size={20} color={WarmColors.primary} />
+                        </View>
                         <View style={styles.activationTimeButtonText}>
                           <Text style={styles.activationTimeLabel}>Time</Text>
                           <Text style={styles.activationTimeValue}>
@@ -914,7 +942,7 @@ export default function CreateReminderScreen() {
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: WarmColors.background,
   },
   container: {
     flex: 1,
@@ -922,39 +950,37 @@ const styles = StyleSheet.create({
   handleBar: {
     width: '100%',
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
   handle: {
     width: 36,
     height: 5,
-    backgroundColor: '#D1D1D6',
+    backgroundColor: WarmColors.border,
     borderRadius: 3,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    backgroundColor: WarmColors.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: WarmColors.border,
   },
   cancelButton: {
-    fontSize: 16,
-    color: '#007AFF',
+    ...Typography.body,
+    color: WarmColors.primary,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    ...Typography.h4,
+    color: WarmColors.textPrimary,
   },
   saveButton: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
+    ...Typography.bodyBold,
+    color: WarmColors.primary,
   },
   saveButtonDisabled: {
     opacity: 0.5,
@@ -963,55 +989,59 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    marginTop: 16,
+    backgroundColor: WarmColors.background,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
   },
   sectionLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 8,
+    ...Typography.bodyBold,
+    color: WarmColors.textPrimary,
+    marginBottom: Spacing.sm,
   },
   optional: {
-    fontSize: 14,
+    ...Typography.caption,
+    color: WarmColors.textTertiary,
     fontWeight: '400',
-    color: '#999',
   },
   sectionHint: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
+    ...Typography.caption,
+    color: WarmColors.textSecondary,
+    marginBottom: Spacing.md,
   },
   titleInput: {
-    fontSize: 16,
-    color: '#000',
-    padding: 12,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
+    ...Typography.body,
+    color: WarmColors.textPrimary,
+    padding: Spacing.md,
+    backgroundColor: WarmColors.surfaceVariant,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: WarmColors.border,
   },
   descriptionInput: {
-    fontSize: 16,
-    color: '#000',
-    padding: 12,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
+    ...Typography.body,
+    color: WarmColors.textPrimary,
+    padding: Spacing.md,
+    backgroundColor: WarmColors.surfaceVariant,
+    borderRadius: BorderRadius.sm,
     minHeight: 80,
+    borderWidth: 1,
+    borderColor: WarmColors.border,
   },
   triggerOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F9F9F9',
-    borderRadius: 12,
-    marginBottom: 12,
+    padding: Spacing.md,
+    backgroundColor: WarmColors.surfaceVariant,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
     borderWidth: 2,
     borderColor: 'transparent',
+    ...Elevation.level1,
   },
   triggerOptionSelected: {
-    backgroundColor: '#E3F2FD',
-    borderColor: '#007AFF',
+    backgroundColor: `${WarmColors.primary}15`,
+    borderColor: WarmColors.primary,
   },
   triggerOptionLocked: {
     opacity: 0.6,
@@ -1021,53 +1051,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  triggerIcon: {
-    fontSize: 24,
-    marginRight: 12,
+  triggerIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: `${WarmColors.primary}20`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  triggerIconContainerSelected: {
+    backgroundColor: WarmColors.primary,
   },
   triggerTextContainer: {
     flex: 1,
   },
   triggerLabel: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: '500',
+    ...Typography.bodyBold,
+    color: WarmColors.textPrimary,
+  },
+  selectedInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+    gap: 4,
   },
   proLabel: {
-    fontSize: 12,
-    color: '#FF9500',
+    ...Typography.small,
+    color: WarmColors.accent,
     fontWeight: '600',
-    marginTop: 2,
   },
   selectedAppLabel: {
-    fontSize: 12,
-    color: '#007AFF',
+    ...Typography.small,
+    color: WarmColors.primary,
     fontWeight: '600',
-    marginTop: 2,
   },
   triggerRight: {
-    marginLeft: 12,
-  },
-  lockIcon: {
-    fontSize: 20,
+    marginLeft: Spacing.md,
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#CCC',
+    borderColor: WarmColors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  checkmark: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+    backgroundColor: WarmColors.primary,
+    borderColor: WarmColors.primary,
   },
   proUpsell: {
     backgroundColor: '#007AFF',
@@ -1195,111 +1228,109 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: WarmColors.overlay,
   },
   datePickerModal: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: WarmColors.background,
+    borderRadius: BorderRadius.lg,
     width: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
+    ...Elevation.level5,
     overflow: 'hidden',
   },
   datePickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: WarmColors.border,
   },
   datePickerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    ...Typography.h4,
+    color: WarmColors.textPrimary,
   },
   datePickerClose: {
     fontSize: 24,
-    color: '#999',
+    color: WarmColors.textTertiary,
     fontWeight: '300',
   },
   datePickerButtons: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 12,
+    padding: Spacing.md,
+    gap: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: WarmColors.border,
   },
   datePickerCancelButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    backgroundColor: '#F0F0F0',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: WarmColors.surfaceVariant,
     alignItems: 'center',
   },
   datePickerCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
+    ...Typography.bodyBold,
+    color: WarmColors.textSecondary,
   },
   datePickerConfirmButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    backgroundColor: '#007AFF',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: WarmColors.primary,
     alignItems: 'center',
   },
   datePickerConfirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    ...Typography.bodyBold,
+    color: WarmColors.textOnPrimary,
   },
   // Activation Time Styles
   activationTimeContainer: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
+    gap: Spacing.md,
+    marginTop: Spacing.md,
   },
   activationTimeButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
+    padding: Spacing.md,
+    backgroundColor: WarmColors.surfaceVariant,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: WarmColors.border,
+    ...Elevation.level1,
   },
-  activationTimeButtonIcon: {
-    fontSize: 24,
-    marginRight: 12,
+  activationTimeIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: `${WarmColors.primary}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
   },
   activationTimeButtonText: {
     flex: 1,
   },
   activationTimeLabel: {
-    fontSize: 12,
-    color: '#666',
+    ...Typography.small,
+    color: WarmColors.textSecondary,
     marginBottom: 4,
   },
   activationTimeValue: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: '500',
+    ...Typography.bodyBold,
+    color: WarmColors.textPrimary,
   },
   clearActivationButton: {
-    marginTop: 12,
-    paddingVertical: 12,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.md,
     alignItems: 'center',
   },
   clearActivationText: {
-    fontSize: 14,
-    color: '#FF3B30',
+    ...Typography.caption,
+    color: WarmColors.error,
     fontWeight: '600',
   },
 });

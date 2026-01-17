@@ -19,12 +19,14 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   getCurrentLocation,
   requestLocationPermission,
   getLocationPermissionStatus,
 } from '../native-bridge/LocationBridge';
 import { LocationConfig } from '../domain';
+import { WarmColors } from '@/constants/theme';
 
 interface LocationPickerProps {
   visible: boolean;
@@ -185,7 +187,7 @@ export default function LocationPicker({
               <ActivityIndicator color="#007AFF" />
             ) : (
               <>
-                <Text style={styles.currentLocationIcon}>📍</Text>
+                <MaterialIcons name="location-on" size={20} color={WarmColors.primary} />
                 <Text style={styles.currentLocationText}>Use Current Location</Text>
               </>
             )}

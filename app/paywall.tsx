@@ -6,6 +6,8 @@
 
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 
 export default function PaywallScreen() {
   const router = useRouter();
@@ -15,8 +17,9 @@ export default function PaywallScreen() {
       <TouchableOpacity
         style={styles.closeButton}
         onPress={() => router.back()}
+        activeOpacity={0.7}
       >
-        <Text style={styles.closeButtonText}>✕</Text>
+        <MaterialIcons name="close" size={20} color={WarmColors.textSecondary} />
       </TouchableOpacity>
 
       <View style={styles.content}>
@@ -27,15 +30,21 @@ export default function PaywallScreen() {
 
         <View style={styles.features}>
           <View style={styles.feature}>
-            <Text style={styles.featureIcon}>📍</Text>
+            <View style={styles.featureIconContainer}>
+              <MaterialIcons name="location-on" size={24} color={WarmColors.primary} />
+            </View>
             <Text style={styles.featureText}>Remind me when I'm already there</Text>
           </View>
           <View style={styles.feature}>
-            <Text style={styles.featureIcon}>📲</Text>
+            <View style={styles.featureIconContainer}>
+              <MaterialIcons name="apps" size={24} color={WarmColors.primary} />
+            </View>
             <Text style={styles.featureText}>Remind me when I open the app</Text>
           </View>
           <View style={styles.feature}>
-            <Text style={styles.featureIcon}>🔌</Text>
+            <View style={styles.featureIconContainer}>
+              <MaterialIcons name="battery-charging-full" size={24} color={WarmColors.primary} />
+            </View>
             <Text style={styles.featureText}>Remind me when I'm actually free</Text>
           </View>
         </View>
@@ -112,9 +121,14 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
   },
-  featureIcon: {
-    fontSize: 28,
-    marginRight: 16,
+  featureIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: `${WarmColors.primary}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
   },
   featureText: {
     fontSize: 16,
