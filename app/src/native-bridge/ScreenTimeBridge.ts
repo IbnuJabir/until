@@ -44,8 +44,9 @@ export interface AppSelectionResult {
  */
 export async function requestScreenTimePermission(): Promise<ScreenTimeAuthorizationStatus> {
   if (!ScreenTimeModule) {
-    console.warn('[ScreenTimeBridge] Module not available');
-    return 'unknown';
+    const error = new Error('ScreenTimeModule not available. Please build the app using Xcode.');
+    console.error('[ScreenTimeBridge]', error.message);
+    throw error;
   }
 
   try {
@@ -105,15 +106,23 @@ export function subscribeToPermissionChanges(
  */
 export async function presentAppPicker(): Promise<AppSelectionResult> {
   if (!ScreenTimeModule) {
-    throw new Error('ScreenTimeModule not available');
+    throw new Error('ScreenTimeModule not available. Please build the app using Xcode to enable Screen Time features.');
   }
 
   try {
     const result = await ScreenTimeModule.presentAppPicker();
     console.log('[ScreenTimeBridge] App selection result:', result);
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error('[ScreenTimeBridge] Failed to present app picker:', error);
+    
+    // Handle user cancellation gracefully
+    if (error.code === 'USER_CANCELLED' || error.message?.includes('cancelled')) {
+      const cancelledError: any = new Error('User cancelled app selection');
+      cancelledError.code = 'USER_CANCELLED';
+      throw cancelledError;
+    }
+    
     throw error;
   }
 }

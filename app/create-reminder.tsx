@@ -16,6 +16,8 @@ import { useScreenTime } from '@/app/src/hooks/useScreenTime';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import MapPicker from '@/app/src/ui/MapPicker';
 import SavedPlacesList from '@/app/src/ui/SavedPlacesList';
+import { BorderRadius, Elevation, Spacing, Typography, WarmColors } from '@/constants/theme';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -32,8 +34,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 
 export default function CreateReminderScreen() {
   const router = useRouter();
@@ -163,6 +163,16 @@ export default function CreateReminderScreen() {
   };
 
   const handleAppTriggerSelection = async () => {
+    // Check if ScreenTime module is available
+    if (!screenTime.isAuthorized && screenTime.authStatus === 'unknown') {
+      Alert.alert(
+        'Feature Not Available',
+        'Screen Time monitoring is not available on this device. This feature requires native iOS modules that need to be built with Xcode.\n\nPlease build the app using Xcode or use the npm script: npm run run:ios:device',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     // Step 1: Check if already authorized
     if (!screenTime.isAuthorized) {
       // Request permission first
@@ -174,11 +184,26 @@ export default function CreateReminderScreen() {
           {
             text: 'Continue',
             onPress: async () => {
-              await screenTime.requestPermission();
+              try {
+                await screenTime.requestPermission();
 
-              // After permission, check if authorized and continue
-              if (screenTime.isAuthorized) {
-                await showAppPickerFlow();
+                // After permission, check if authorized and continue
+                if (screenTime.isAuthorized) {
+                  await showAppPickerFlow();
+                } else {
+                  Alert.alert(
+                    'Permission Denied',
+                    'Screen Time permission is required for app-based reminders. Please enable it in Settings.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              } catch (error: any) {
+                console.error('[CreateReminder] Permission request failed:', error);
+                Alert.alert(
+                  'Error',
+                  error.message || 'Failed to request Screen Time permission. Please try again.',
+                  [{ text: 'OK' }]
+                );
               }
             },
           },
@@ -204,10 +229,23 @@ export default function CreateReminderScreen() {
           'Apps Selected',
           `You selected ${result.selectedCount} app${result.selectedCount > 1 ? 's' : ''}. This reminder will trigger when you open any of them.`
         );
+      } else if (result === null) {
+        // User cancelled - don't show error
+        console.log('[CreateReminder] User cancelled app selection');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[CreateReminder] Failed to show app picker:', error);
-      Alert.alert('Error', 'Failed to show app picker. Please try again.');
+      
+      // Check if it's a module not available error
+      if (error.message?.includes('not available') || screenTime.error) {
+        Alert.alert(
+          'Feature Not Available',
+          'Screen Time monitoring requires native iOS modules. Please build the app using Xcode:\n\n1. Open ios/until.xcworkspace in Xcode\n2. Build and run on your device\n\nOr use: npm run run:ios:device',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', error.message || 'Failed to show app picker. Please try again.');
+      }
     }
   };
 
@@ -259,6 +297,7 @@ export default function CreateReminderScreen() {
         `"${location.name}" has been saved and set as the trigger location.`
       );
     } catch (error) {
+      console.error('[CreateReminder] Failed to save location:', error);
       Alert.alert('Error', 'Failed to save location. Please try again.');
     }
   };
@@ -556,6 +595,7 @@ export default function CreateReminderScreen() {
                   const showAppCount = isAppTrigger && isSelected && selectedAppCount > 0;
                   const showLocationInfo = isLocationTrigger && isSelected && selectedLocation;
                   const showScheduledTime = isScheduledTimeTrigger && isSelected;
+                  const isAppTriggerUnavailable = isAppTrigger && screenTime.authStatus === 'unknown';
 
                   return (
                     <TouchableOpacity
@@ -564,10 +604,11 @@ export default function CreateReminderScreen() {
                         styles.triggerOption,
                         isSelected && styles.triggerOptionSelected,
                         isLocked && styles.triggerOptionLocked,
+                        isAppTriggerUnavailable && styles.triggerOptionUnavailable,
                       ]}
                       onPress={() => toggleTrigger(option.type, option.isPro)}
                       activeOpacity={0.7}
-                      disabled={screenTime.isLoading}
+                      disabled={screenTime.isLoading || isAppTriggerUnavailable}
                     >
                       <View style={styles.triggerLeft}>
                         <View style={[styles.triggerIconContainer, isSelected && styles.triggerIconContainerSelected]}>
@@ -610,7 +651,15 @@ export default function CreateReminderScreen() {
                               </Text>
                             </View>
                           )}
-                          {isLocked && (
+                          {isAppTriggerUnavailable && (
+                            <View style={styles.selectedInfoContainer}>
+                              <MaterialIcons name="warning" size={12} color={WarmColors.warning} />
+                              <Text style={styles.unavailableLabel}>
+                                Requires native build (build with Xcode)
+                              </Text>
+                            </View>
+                          )}
+                          {isLocked && !isAppTriggerUnavailable && (
                             <View style={styles.selectedInfoContainer}>
                               <MaterialIcons name="lock" size={12} color={WarmColors.accent} />
                               <Text style={styles.proLabel}>Pro Feature</Text>
@@ -1046,6 +1095,10 @@ const styles = StyleSheet.create({
   triggerOptionLocked: {
     opacity: 0.6,
   },
+  triggerOptionUnavailable: {
+    opacity: 0.5,
+    backgroundColor: WarmColors.surfaceVariant,
+  },
   triggerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1084,6 +1137,11 @@ const styles = StyleSheet.create({
   selectedAppLabel: {
     ...Typography.small,
     color: WarmColors.primary,
+    fontWeight: '600',
+  },
+  unavailableLabel: {
+    ...Typography.small,
+    color: WarmColors.warning,
     fontWeight: '600',
   },
   triggerRight: {

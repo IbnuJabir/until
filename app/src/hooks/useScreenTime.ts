@@ -46,13 +46,27 @@ export function useScreenTime(): UseScreenTimeResult {
         const status = await getScreenTimePermissionStatus();
         setAuthStatus(status);
 
+        // If status is 'unknown', the module is not available
+        if (status === 'unknown') {
+          setError('Screen Time module not available. Please build with Xcode.');
+          setIsLoading(false);
+          return;
+        }
+
         if (status === 'approved') {
           const hasApps = await hasSelectedApps();
           setHasAppsSelected(hasApps);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('[useScreenTime] Failed to check initial status:', err);
-        setError('Failed to check Screen Time status');
+        
+        // If module is not available, set appropriate error
+        if (err.message?.includes('not available') || err.message?.includes('ScreenTimeModule')) {
+          setError('Screen Time module not available. Please build with Xcode.');
+          setAuthStatus('unknown');
+        } else {
+          setError('Failed to check Screen Time status');
+        }
       } finally {
         setIsLoading(false);
       }
