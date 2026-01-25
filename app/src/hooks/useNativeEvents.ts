@@ -159,11 +159,12 @@ export function useNativeEvents() {
           console.log('=================================================');
 
           // Convert raw event to AppOpenedEvent format
+          // The activityName contains the unique reminder identifier (e.g., "reminder_abc123")
           const appOpenedEvent = {
             type: SystemEventType.APP_OPENED,
             timestamp: rawEvent.timestamp,
             data: {
-              bundleId: rawEvent.eventName, // Use eventName as bundleId identifier
+              bundleId: rawEvent.activityName, // Use activityName to match specific reminder
             },
           };
 

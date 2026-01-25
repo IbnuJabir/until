@@ -175,15 +175,19 @@ export function doesTriggerMatchEvent(
         if (trigger.type !== TriggerType.APP_OPENED) {
           return false;
         }
-        // Check if bundleId matches
-        // 'screentime.apps.selected' is a wildcard that matches ANY app opened event
-        // This is because the DeviceActivityMonitor monitors all user-selected apps
-        const config = trigger.config as { bundleId: string };
-        const isWildcard = config?.bundleId === 'screentime.apps.selected';
-        const isExactMatch = config?.bundleId === appEvent.data.bundleId;
+        // Match by activity name - each reminder has a unique activity name
+        const config = trigger.config as { activityName?: string; bundleId?: string };
 
-        if (isWildcard || isExactMatch) {
-          console.log(`[RuleEngine] APP_OPENED trigger matched (wildcard: ${isWildcard}, exact: ${isExactMatch})`);
+        // New approach: match by activityName
+        if (config?.activityName && appEvent.data.bundleId === config.activityName) {
+          console.log(`[RuleEngine] APP_OPENED trigger matched by activity name: ${config.activityName}`);
+          return true;
+        }
+
+        // Legacy fallback: wildcard matching for old reminders
+        const isWildcard = config?.bundleId === 'screentime.apps.selected';
+        if (isWildcard) {
+          console.log(`[RuleEngine] APP_OPENED trigger matched (legacy wildcard)`);
           return true;
         }
 

@@ -281,20 +281,14 @@ export default function CreateReminderScreen() {
           description += `${result.webDomainCount} ${result.webDomainCount === 1 ? 'website' : 'websites'}`;
         }
 
-        // Start monitoring the selected apps
-        console.log('[CreateReminder] Starting monitoring for selected apps...');
-        const monitoringStarted = await screenTime.startMonitoring();
-
-        if (monitoringStarted) {
-          console.log('[CreateReminder] ✅ Monitoring started successfully');
-        } else {
-          console.warn('[CreateReminder] ⚠️ Monitoring may not have started - extension might not be set up');
-        }
+        // NOTE: Monitoring will start when the reminder is created
+        // This allows us to use the reminder ID as the unique activity name
+        console.log('[CreateReminder] Apps selected, will start monitoring when reminder is created');
 
         // Show success message with detailed count
         Alert.alert(
           '✓ Apps Selected',
-          `Selected: ${description}\n\nMonitoring ${monitoringStarted ? 'started' : 'pending (extension setup required)'}.\n\nThis reminder will trigger when you open any of the selected items.`,
+          `Selected: ${description}\n\nMonitoring will start when you create the reminder.`,
           [{ text: 'OK' }]
         );
       } else if (result === null) {
@@ -544,15 +538,19 @@ export default function CreateReminderScreen() {
       // Calculate activation datetime for event-based triggers
       const activationDateTime = calculateActivationDateTime();
 
+      // Create reminder first to get its ID
+      const reminder = createReminder(title.trim(), [], [], description.trim());
+
       // Create triggers with config for APP_OPENED, LOCATION_ENTER, and SCHEDULED_TIME
+      // For APP_OPENED, we use the reminder ID as the unique activity name
       const triggers = selectedTriggers.map((type) => {
         if (type === TriggerType.APP_OPENED) {
-          // Screen Time API uses tokenized app identifiers (not bundle IDs)
-          // Store a placeholder config - actual monitoring happens via native module
+          // Use reminder ID as unique activity name for monitoring
+          const activityName = `reminder_${reminder.id}`;
           return createTrigger(
             type,
             {
-              bundleId: 'screentime.apps.selected',
+              activityName,
               appName: `${selectedAppCount} selected app${selectedAppCount > 1 ? 's' : ''}`,
             },
             activationDateTime
@@ -568,8 +566,8 @@ export default function CreateReminderScreen() {
         return createTrigger(type, null, activationDateTime);
       });
 
-      // Create reminder
-      const reminder = createReminder(title.trim(), triggers, [], description.trim());
+      // Update reminder with triggers
+      reminder.triggers = triggers;
 
       // Log location details if location trigger is selected
       // if (selectedTriggers.includes(TriggerType.LOCATION_ENTER) && selectedLocation) {
@@ -585,6 +583,23 @@ export default function CreateReminderScreen() {
 
       // Save to store (which persists to database)
       await addReminder(reminder);
+
+      // Start monitoring for APP_OPENED triggers with unique activity name
+      if (selectedTriggers.includes(TriggerType.APP_OPENED)) {
+        const appTrigger = triggers.find(t => t.type === TriggerType.APP_OPENED);
+        if (appTrigger && appTrigger.config) {
+          const config = appTrigger.config as { activityName?: string };
+          if (config.activityName) {
+            console.log(`[CreateReminder] Starting monitoring with activity name: ${config.activityName}`);
+            const result = await screenTime.startMonitoring(config.activityName);
+            if (result.success) {
+              console.log(`[CreateReminder] ✅ Monitoring started for: ${config.activityName}`);
+            } else {
+              console.warn(`[CreateReminder] ⚠️ Failed to start monitoring for: ${config.activityName}`);
+            }
+          }
+        }
+      }
 
       // Dismiss modal and navigate back to list page with toast
       router.dismissAll();

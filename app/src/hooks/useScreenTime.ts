@@ -30,7 +30,7 @@ export interface UseScreenTimeResult {
   requestPermission: () => Promise<ScreenTimeAuthorizationStatus>;
   showAppPicker: () => Promise<AppSelectionResult | null>;
   clearApps: () => Promise<void>;
-  startMonitoring: () => Promise<boolean>;
+  startMonitoring: (activityName: string) => Promise<{ success: boolean; activityName?: string }>;
   stopMonitoring: () => Promise<boolean>;
 
   // Error state
@@ -170,20 +170,20 @@ export function useScreenTime(): UseScreenTimeResult {
   }, []);
 
   // Start monitoring selected apps
-  const startMonitoringApps = useCallback(async (): Promise<boolean> => {
+  const startMonitoringApps = useCallback(async (activityName: string): Promise<{ success: boolean; activityName?: string }> => {
     try {
-      const success = await startMonitoring();
-      if (success) {
+      const result = await startMonitoring(activityName);
+      if (result.success) {
         console.log('[useScreenTime] Monitoring started successfully');
       } else {
         console.error('[useScreenTime] Failed to start monitoring');
         setError('Failed to start monitoring');
       }
-      return success;
+      return result;
     } catch (err: any) {
       console.error('[useScreenTime] Failed to start monitoring:', err);
       setError(err.message || 'Failed to start monitoring');
-      return false;
+      return { success: false };
     }
   }, []);
 

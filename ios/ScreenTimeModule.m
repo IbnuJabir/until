@@ -37,7 +37,8 @@ RCT_EXTERN_METHOD(
 
 // Monitoring methods (requires DeviceActivity extension)
 RCT_EXTERN_METHOD(
-  startMonitoring:(RCTPromiseResolveBlock)resolve
+  startMonitoring:(NSString *)activityNameString
+  resolver:(RCTPromiseResolveBlock)resolve
   rejecter:(RCTPromiseRejectBlock)reject
 )
 

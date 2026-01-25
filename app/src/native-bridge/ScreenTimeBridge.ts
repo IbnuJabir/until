@@ -171,20 +171,21 @@ export async function clearSelectedApps(): Promise<boolean> {
 /**
  * Start monitoring selected apps for usage
  * Requires DeviceActivity extension to be set up
+ * @param activityName Unique activity name for this monitoring session (e.g., reminder ID)
  */
-export async function startMonitoring(): Promise<boolean> {
+export async function startMonitoring(activityName: string): Promise<{ success: boolean; activityName?: string }> {
   if (!ScreenTimeModule) {
     console.error('[ScreenTimeBridge] Module not available');
-    return false;
+    return { success: false };
   }
 
   try {
-    const result = await ScreenTimeModule.startMonitoring();
+    const result = await ScreenTimeModule.startMonitoring(activityName);
     console.log('[ScreenTimeBridge] Monitoring started:', result);
-    return true;
+    return { success: true, activityName: result.activityName };
   } catch (error) {
     console.error('[ScreenTimeBridge] Failed to start monitoring:', error);
-    return false;
+    return { success: false };
   }
 }
 

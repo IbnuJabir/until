@@ -48,7 +48,8 @@ export interface LocationConfig {
 }
 
 export interface AppOpenedConfig {
-  bundleId: string; // e.g., "com.apple.mobilesafari"
+  bundleId?: string; // e.g., "com.apple.mobilesafari" (legacy)
+  activityName?: string; // Unique DeviceActivity name (e.g., "reminder_abc123")
   appName: string; // user-friendly name
 }
 
