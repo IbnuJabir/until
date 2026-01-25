@@ -176,8 +176,18 @@ export function doesTriggerMatchEvent(
           return false;
         }
         // Check if bundleId matches
+        // 'screentime.apps.selected' is a wildcard that matches ANY app opened event
+        // This is because the DeviceActivityMonitor monitors all user-selected apps
         const config = trigger.config as { bundleId: string };
-        return config?.bundleId === appEvent.data.bundleId;
+        const isWildcard = config?.bundleId === 'screentime.apps.selected';
+        const isExactMatch = config?.bundleId === appEvent.data.bundleId;
+
+        if (isWildcard || isExactMatch) {
+          console.log(`[RuleEngine] APP_OPENED trigger matched (wildcard: ${isWildcard}, exact: ${isExactMatch})`);
+          return true;
+        }
+
+        return false;
       }
 
       default:

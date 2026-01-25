@@ -3,7 +3,7 @@
  * Connects native modules to the Zustand store
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useReminderStore } from '../store/reminderStore';
 import { subscribeToAppBecameActive } from '../native-bridge/AppLifecycleBridge';
 import {
@@ -12,12 +12,14 @@ import {
   disableBatteryMonitoring,
 } from '../native-bridge/BatteryBridge';
 import { subscribeToRegionEntered } from '../native-bridge/LocationBridge';
+import { checkForAppOpenedEvents } from '../native-bridge/ScreenTimeBridge';
 import { SystemEventType, ReminderStatus } from '../domain';
 
 export function useNativeEvents() {
   const handleEvent = useReminderStore((state) => state.handleEvent);
   const reminders = useReminderStore((state) => state.reminders);
   const loadFromStorage = useReminderStore((state) => state.loadFromStorage);
+  const lastProcessedEventRef = useRef<string | null>(null);
 
   // Load reminders from database on mount
   useEffect(() => {
@@ -124,9 +126,61 @@ export function useNativeEvents() {
       });
     });
 
+    // Poll for app opened events from DeviceActivity extension
+    // The extension writes events to App Group storage, which we need to check periodically
+    console.log('[useNativeEvents] Setting up APP_OPENED polling interval...');
+    let pollCount = 0;
+    const pollInterval = setInterval(async () => {
+      pollCount++;
+      console.log(`[useNativeEvents] 🔍 Polling for app opened events (poll #${pollCount})...`);
+
+      try {
+        const rawEvent = await checkForAppOpenedEvents();
+        console.log('[useNativeEvents] Poll result:', rawEvent ? 'EVENT FOUND' : 'no event');
+
+        if (rawEvent) {
+          // Create a unique identifier for this event to prevent duplicate processing
+          const eventId = `${rawEvent.timestamp}-${rawEvent.eventName}`;
+
+          // Skip if we've already processed this event
+          if (lastProcessedEventRef.current === eventId) {
+            console.log('[useNativeEvents] ⏭️  Skipping duplicate event:', eventId);
+            return;
+          }
+
+          lastProcessedEventRef.current = eventId;
+
+          console.log('=================================================');
+          console.log('[useNativeEvents] 📱 APP_OPENED event detected from polling!');
+          console.log('[useNativeEvents] Event timestamp:', new Date(rawEvent.timestamp).toISOString());
+          console.log('[useNativeEvents] Event name:', rawEvent.eventName);
+          console.log('[useNativeEvents] Activity name:', rawEvent.activityName);
+          console.log('[useNativeEvents] Active reminders:', reminders.filter(r => r.status === ReminderStatus.WAITING).length);
+          console.log('=================================================');
+
+          // Convert raw event to AppOpenedEvent format
+          const appOpenedEvent = {
+            type: SystemEventType.APP_OPENED,
+            timestamp: rawEvent.timestamp,
+            data: {
+              bundleId: rawEvent.eventName, // Use eventName as bundleId identifier
+            },
+          };
+
+          handleEvent(appOpenedEvent).catch((error) => {
+            console.error('[useNativeEvents] Error handling app opened event:', error);
+          });
+        }
+      } catch (error) {
+        console.error('[useNativeEvents] ❌ Error polling for app opened events:', error);
+        console.error('[useNativeEvents] Error details:', JSON.stringify(error, null, 2));
+      }
+    }, 3000); // Poll every 3 seconds
+
     // Cleanup on unmount
     return () => {
       console.log('[useNativeEvents] Cleaning up native event listeners...');
+      clearInterval(pollInterval);
       unsubscribeAppLifecycle();
       unsubscribeCharging();
       unsubscribeLocation();
