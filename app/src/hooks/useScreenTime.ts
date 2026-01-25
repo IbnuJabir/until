@@ -11,6 +11,8 @@ import {
   hasSelectedApps,
   clearSelectedApps,
   subscribeToPermissionChanges,
+  startMonitoring,
+  stopMonitoring,
   ScreenTimeAuthorizationStatus,
   AppSelectionResult,
 } from '../native-bridge/ScreenTimeBridge';
@@ -25,9 +27,11 @@ export interface UseScreenTimeResult {
   hasAppsSelected: boolean;
 
   // Actions
-  requestPermission: () => Promise<void>;
+  requestPermission: () => Promise<ScreenTimeAuthorizationStatus>;
   showAppPicker: () => Promise<AppSelectionResult | null>;
   clearApps: () => Promise<void>;
+  startMonitoring: () => Promise<boolean>;
+  stopMonitoring: () => Promise<boolean>;
 
   // Error state
   error: string | null;
@@ -91,7 +95,7 @@ export function useScreenTime(): UseScreenTimeResult {
   }, []);
 
   // Request Screen Time permission
-  const requestPermission = useCallback(async () => {
+  const requestPermission = useCallback(async (): Promise<ScreenTimeAuthorizationStatus> => {
     setIsLoading(true);
     setError(null);
 
@@ -102,9 +106,12 @@ export function useScreenTime(): UseScreenTimeResult {
       if (status !== 'approved') {
         setError('Screen Time permission not granted. Please grant permission in Settings.');
       }
+
+      return status;
     } catch (err: any) {
       console.error('[useScreenTime] Failed to request permission:', err);
       setError(err.message || 'Failed to request Screen Time permission');
+      return 'denied';
     } finally {
       setIsLoading(false);
     }
@@ -162,6 +169,38 @@ export function useScreenTime(): UseScreenTimeResult {
     }
   }, []);
 
+  // Start monitoring selected apps
+  const startMonitoringApps = useCallback(async (): Promise<boolean> => {
+    try {
+      const success = await startMonitoring();
+      if (success) {
+        console.log('[useScreenTime] Monitoring started successfully');
+      } else {
+        console.error('[useScreenTime] Failed to start monitoring');
+        setError('Failed to start monitoring');
+      }
+      return success;
+    } catch (err: any) {
+      console.error('[useScreenTime] Failed to start monitoring:', err);
+      setError(err.message || 'Failed to start monitoring');
+      return false;
+    }
+  }, []);
+
+  // Stop monitoring
+  const stopMonitoringApps = useCallback(async (): Promise<boolean> => {
+    try {
+      const success = await stopMonitoring();
+      if (success) {
+        console.log('[useScreenTime] Monitoring stopped successfully');
+      }
+      return success;
+    } catch (err: any) {
+      console.error('[useScreenTime] Failed to stop monitoring:', err);
+      return false;
+    }
+  }, []);
+
   return {
     authStatus,
     isAuthorized: authStatus === 'approved',
@@ -170,6 +209,8 @@ export function useScreenTime(): UseScreenTimeResult {
     requestPermission,
     showAppPicker,
     clearApps,
+    startMonitoring: startMonitoringApps,
+    stopMonitoring: stopMonitoringApps,
     error,
   };
 }

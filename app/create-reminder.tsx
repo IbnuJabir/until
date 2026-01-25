@@ -45,6 +45,11 @@ export default function CreateReminderScreen() {
   const [selectedTriggers, setSelectedTriggers] = useState<TriggerType[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedAppCount, setSelectedAppCount] = useState<number>(0);
+  const [selectedAppDetails, setSelectedAppDetails] = useState<{
+    appCount: number;
+    categoryCount: number;
+    webDomainCount: number;
+  }>({ appCount: 0, categoryCount: 0, webDomainCount: 0 });
   const [selectedLocation, setSelectedLocation] = useState<LocationConfig | null>(null);
   const [showSavedPlacesList, setShowSavedPlacesList] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
@@ -120,12 +125,37 @@ export default function CreateReminderScreen() {
     // If selecting "When I open an app", handle Screen Time flow
     if (triggerType === TriggerType.APP_OPENED) {
       if (!selectedTriggers.includes(triggerType)) {
+        // First time selecting - show app picker
         await handleAppTriggerSelection();
       } else {
-        // Deselecting - remove trigger and clear selected apps
-        setSelectedTriggers((prev) => prev.filter((t) => t !== triggerType));
-        setSelectedAppCount(0);
-        await screenTime.clearApps();
+        // Already selected - allow user to change apps or deselect
+        Alert.alert(
+          'App Trigger Selected',
+          `You have ${selectedAppCount} ${selectedAppCount === 1 ? 'app' : 'apps'} selected. What would you like to do?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Change Apps',
+              onPress: async () => {
+                // Clear current selection and show picker again
+                await screenTime.clearApps();
+                // Don't call handleAppTriggerSelection as it adds the trigger again
+                // Just show the picker directly
+                await showAppPickerFlow();
+              }
+            },
+            {
+              text: 'Remove Trigger',
+              style: 'destructive',
+              onPress: async () => {
+                setSelectedTriggers((prev) => prev.filter((t) => t !== triggerType));
+                setSelectedAppCount(0);
+                setSelectedAppDetails({ appCount: 0, categoryCount: 0, webDomainCount: 0 });
+                await screenTime.clearApps();
+              }
+            }
+          ]
+        );
       }
       return;
     }
@@ -185,10 +215,10 @@ export default function CreateReminderScreen() {
             text: 'Continue',
             onPress: async () => {
               try {
-                await screenTime.requestPermission();
+                const status = await screenTime.requestPermission();
 
                 // After permission, check if authorized and continue
-                if (screenTime.isAuthorized) {
+                if (status === 'approved') {
                   await showAppPickerFlow();
                 } else {
                   Alert.alert(
@@ -223,11 +253,49 @@ export default function CreateReminderScreen() {
       if (result && result.selectedCount > 0) {
         // User selected apps successfully
         setSelectedAppCount(result.selectedCount);
-        setSelectedTriggers((prev) => [...prev, TriggerType.APP_OPENED]);
+        setSelectedAppDetails({
+          appCount: result.appCount || 0,
+          categoryCount: result.categoryCount || 0,
+          webDomainCount: result.webDomainCount || 0,
+        });
 
+        // Only add trigger if not already present (prevents duplicates when changing apps)
+        setSelectedTriggers((prev) => {
+          if (!prev.includes(TriggerType.APP_OPENED)) {
+            return [...prev, TriggerType.APP_OPENED];
+          }
+          return prev;
+        });
+
+        // Build description based on selection
+        let description = '';
+        if (result.appCount && result.appCount > 0) {
+          description += `${result.appCount} ${result.appCount === 1 ? 'app' : 'apps'}`;
+        }
+        if (result.categoryCount && result.categoryCount > 0) {
+          if (description) description += ', ';
+          description += `${result.categoryCount} ${result.categoryCount === 1 ? 'category' : 'categories'}`;
+        }
+        if (result.webDomainCount && result.webDomainCount > 0) {
+          if (description) description += ', ';
+          description += `${result.webDomainCount} ${result.webDomainCount === 1 ? 'website' : 'websites'}`;
+        }
+
+        // Start monitoring the selected apps
+        console.log('[CreateReminder] Starting monitoring for selected apps...');
+        const monitoringStarted = await screenTime.startMonitoring();
+
+        if (monitoringStarted) {
+          console.log('[CreateReminder] ✅ Monitoring started successfully');
+        } else {
+          console.warn('[CreateReminder] ⚠️ Monitoring may not have started - extension might not be set up');
+        }
+
+        // Show success message with detailed count
         Alert.alert(
-          'Apps Selected',
-          `You selected ${result.selectedCount} app${result.selectedCount > 1 ? 's' : ''}. This reminder will trigger when you open any of them.`
+          '✓ Apps Selected',
+          `Selected: ${description}\n\nMonitoring ${monitoringStarted ? 'started' : 'pending (extension setup required)'}.\n\nThis reminder will trigger when you open any of the selected items.`,
+          [{ text: 'OK' }]
         );
       } else if (result === null) {
         // User cancelled - don't show error
@@ -622,9 +690,21 @@ export default function CreateReminderScreen() {
                           <Text style={styles.triggerLabel}>{option.label}</Text>
                           {showAppCount && (
                             <View style={styles.selectedInfoContainer}>
-                              <MaterialIcons name="apps" size={12} color={WarmColors.primary} />
+                              <MaterialIcons name="check-circle" size={12} color={WarmColors.success} />
                               <Text style={styles.selectedAppLabel}>
-                                {selectedAppCount} app{selectedAppCount > 1 ? 's' : ''} selected
+                                {(() => {
+                                  const parts: string[] = [];
+                                  if (selectedAppDetails.appCount > 0) {
+                                    parts.push(`${selectedAppDetails.appCount} ${selectedAppDetails.appCount === 1 ? 'app' : 'apps'}`);
+                                  }
+                                  if (selectedAppDetails.categoryCount > 0) {
+                                    parts.push(`${selectedAppDetails.categoryCount} ${selectedAppDetails.categoryCount === 1 ? 'category' : 'categories'}`);
+                                  }
+                                  if (selectedAppDetails.webDomainCount > 0) {
+                                    parts.push(`${selectedAppDetails.webDomainCount} ${selectedAppDetails.webDomainCount === 1 ? 'website' : 'websites'}`);
+                                  }
+                                  return parts.length > 0 ? `${parts.join(', ')} · Tap to change` : `${selectedAppCount} selected · Tap to change`;
+                                })()}
                               </Text>
                             </View>
                           )}

@@ -33,6 +33,13 @@ export type ScreenTimeAuthorizationStatus =
 
 export interface AppSelectionResult {
   selectedCount: number;
+  apps?: Array<{
+    type: 'app' | 'category' | 'webdomain';
+    id: number;
+  }>;
+  appCount?: number;
+  categoryCount?: number;
+  webDomainCount?: number;
 }
 
 // MARK: - Authorization
@@ -160,6 +167,72 @@ export async function clearSelectedApps(): Promise<boolean> {
 }
 
 // MARK: - Event Subscription
+
+/**
+ * Start monitoring selected apps for usage
+ * Requires DeviceActivity extension to be set up
+ */
+export async function startMonitoring(): Promise<boolean> {
+  if (!ScreenTimeModule) {
+    console.error('[ScreenTimeBridge] Module not available');
+    return false;
+  }
+
+  try {
+    const result = await ScreenTimeModule.startMonitoring();
+    console.log('[ScreenTimeBridge] Monitoring started:', result);
+    return true;
+  } catch (error) {
+    console.error('[ScreenTimeBridge] Failed to start monitoring:', error);
+    return false;
+  }
+}
+
+/**
+ * Stop monitoring app usage
+ */
+export async function stopMonitoring(): Promise<boolean> {
+  if (!ScreenTimeModule) {
+    console.error('[ScreenTimeBridge] Module not available');
+    return false;
+  }
+
+  try {
+    await ScreenTimeModule.stopMonitoring();
+    console.log('[ScreenTimeBridge] Monitoring stopped');
+    return true;
+  } catch (error) {
+    console.error('[ScreenTimeBridge] Failed to stop monitoring:', error);
+    return false;
+  }
+}
+
+/**
+ * Check for new app opened events from the DeviceActivity extension
+ * Returns null if no new events
+ */
+export async function checkForAppOpenedEvents(): Promise<{
+  timestamp: number;
+  eventName: string;
+  activityName: string;
+  type: string;
+} | null> {
+  if (!ScreenTimeModule) {
+    return null;
+  }
+
+  try {
+    const event = await ScreenTimeModule.checkForAppOpenedEvents();
+    if (event && typeof event === 'object') {
+      console.log('[ScreenTimeBridge] App opened event detected:', event);
+      return event as any;
+    }
+    return null;
+  } catch (error) {
+    console.error('[ScreenTimeBridge] Failed to check for events:', error);
+    return null;
+  }
+}
 
 /**
  * Subscribe to app opened events

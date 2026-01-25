@@ -88,12 +88,4 @@ class UntilDeviceActivityMonitor: DeviceActivityMonitor {
 
         print("[DeviceActivityMonitor] ✅ Posted Darwin notification")
     }
-
-    override func warningDidReachThreshold(
-        _ event: DeviceActivityEvent.Name,
-        activity: DeviceActivityName
-    ) {
-        super.warningDidReachThreshold(event, activity: activity)
-        print("[DeviceActivityMonitor] Warning threshold reached: \(event)")
-    }
 }
