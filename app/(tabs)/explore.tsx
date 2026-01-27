@@ -39,6 +39,14 @@ export default function ExploreScreen() {
         // Could navigate to stats screen
       },
     },
+    {
+      id: 'debug',
+      title: 'Database Debug',
+      description: 'Export database for inspection',
+      icon: 'bug-report' as keyof typeof MaterialIcons.glyphMap,
+      color: '#FF6B6B',
+      onPress: () => router.push('/debug-db' as any),
+    },
   ];
 
   return (

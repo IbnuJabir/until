@@ -219,6 +219,32 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
    * Update reminder status
    */
   updateReminderStatus: async (id: string, status: ReminderStatus) => {
+    const reminder = get().getReminderById(id);
+
+    // If reactivating a reminder (setting status to WAITING), restart monitoring for APP_OPENED triggers
+    if (status === ReminderStatus.WAITING && reminder) {
+      for (const trigger of reminder.triggers) {
+        if (trigger.type === 'APP_OPENED' && trigger.config) {
+          const { startMonitoring } = await import('../native-bridge/ScreenTimeBridge');
+          const config = trigger.config as { activityName?: string; bundleId?: string; appName: string };
+
+          if (config.activityName) {
+            try {
+              const result = await startMonitoring(config.activityName);
+              if (result.success) {
+                console.log(`[Store] Restarted monitoring for reactivated reminder: ${reminder.title}`);
+              } else {
+                console.warn(`[Store] Failed to restart monitoring for: ${reminder.title}`);
+              }
+            } catch (error) {
+              console.error(`[Store] Error restarting monitoring for ${reminder.title}:`, error);
+              // Don't fail the reactivation, just log the error
+            }
+          }
+        }
+      }
+    }
+
     await get().updateReminder(id, { status });
   },
 
