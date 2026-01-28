@@ -628,7 +628,12 @@ export default function CreateReminderScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 140 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>What do you want to remember?</Text>
                 <TextInput
@@ -1130,7 +1135,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingBottom: 100, // Space for bottom button
   },
   section: {
     backgroundColor: WarmColors.background,
@@ -1158,7 +1162,8 @@ const styles = StyleSheet.create({
   titleInput: {
     ...Typography.body,
     color: WarmColors.textPrimary,
-    padding: Spacing.compact.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     backgroundColor: WarmColors.surface,
     borderRadius: BorderRadius.md,
     borderWidth: 0.5,
@@ -1167,7 +1172,8 @@ const styles = StyleSheet.create({
   descriptionInput: {
     ...Typography.body,
     color: WarmColors.textPrimary,
-    padding: Spacing.compact.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     backgroundColor: WarmColors.surface,
     borderRadius: BorderRadius.md,
     minHeight: 80,
