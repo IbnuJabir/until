@@ -192,118 +192,144 @@ export default function ReminderDetailScreen() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Status Badge */}
-        {isFired && (
-          <View style={styles.statusBadge}>
-            <MaterialIcons name="check-circle" size={16} color={WarmColors.textOnPrimary} />
-            <Text style={styles.statusBadgeText}>Fired</Text>
-          </View>
-        )}
-
-        {/* Title */}
-        <Text style={styles.title}>{reminder.title}</Text>
-
-        {/* Description */}
-        {reminder.description && (
-          <View style={styles.section}>
-            <Text style={styles.description}>{reminder.description}</Text>
-          </View>
-        )}
-
-        {/* Triggers Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Triggers ({reminder.triggers.length})
-          </Text>
-          {reminder.triggers.map((trigger) => (
-            <View key={trigger.id} style={styles.triggerCard}>
-              <View style={styles.triggerIconContainer}>
-                <MaterialIcons 
-                  name={getTriggerIcon(trigger.type)} 
-                  size={24} 
-                  color={WarmColors.primary} 
-                />
-              </View>
-              <View style={styles.triggerDetails}>
-                <Text style={styles.triggerLabel}>{getTriggerLabel(trigger.type)}</Text>
-                {trigger.config && (
-                  <Text style={styles.triggerConfig}>
-                    {formatTriggerConfig(trigger.type, trigger.config)}
-                  </Text>
-                )}
-                {trigger.activationDateTime && (
-                  <Text style={styles.triggerActivation}>
-                    Active from: {format(trigger.activationDateTime, 'MMM d, yyyy \'at\' h:mm a')}
-                  </Text>
-                )}
-                {!trigger.activationDateTime && trigger.type !== 'SCHEDULED_TIME' && (
-                  <Text style={styles.triggerActivation}>
-                    Active immediately
-                  </Text>
-                )}
-              </View>
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          {/* Status Badge */}
+          {isFired && (
+            <View style={styles.statusPill}>
+              <MaterialIcons name="check-circle" size={12} color={WarmColors.success} />
+              <Text style={styles.statusPillText}>Completed</Text>
             </View>
-          ))}
+          )}
+
+          {/* Title */}
+          <Text style={styles.title}>{reminder.title}</Text>
+
+          {/* Description */}
+          {reminder.description && (
+            <Text style={styles.description}>{reminder.description}</Text>
+          )}
+
+          {/* Quick Stats */}
+          <View style={styles.quickStats}>
+            <View style={styles.statItem}>
+              <MaterialIcons name="notifications-active" size={16} color={WarmColors.primary} />
+              <Text style={styles.statText}>{reminder.triggers.length} trigger{reminder.triggers.length !== 1 ? 's' : ''}</Text>
+            </View>
+            {reminder.conditions.length > 0 && (
+              <View style={styles.statItem}>
+                <MaterialIcons name="rule" size={16} color={WarmColors.accent} />
+                <Text style={styles.statText}>{reminder.conditions.length} condition{reminder.conditions.length !== 1 ? 's' : ''}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Triggers Timeline */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>When</Text>
+          <View style={styles.timelineContainer}>
+            {reminder.triggers.map((trigger, index) => (
+              <View key={trigger.id} style={styles.timelineItem}>
+                {/* Timeline dot and line */}
+                <View style={styles.timelineLeft}>
+                  <View style={styles.timelineDot}>
+                    <MaterialIcons
+                      name={getTriggerIcon(trigger.type)}
+                      size={14}
+                      color={WarmColors.primary}
+                    />
+                  </View>
+                  {index < reminder.triggers.length - 1 && (
+                    <View style={styles.timelineLine} />
+                  )}
+                </View>
+
+                {/* Trigger content */}
+                <View style={styles.timelineContent}>
+                  <Text style={styles.triggerLabel}>{getTriggerLabel(trigger.type)}</Text>
+                  {trigger.config && (
+                    <Text style={styles.triggerConfig}>
+                      {formatTriggerConfig(trigger.type, trigger.config)}
+                    </Text>
+                  )}
+                  {trigger.activationDateTime && trigger.type !== 'SCHEDULED_TIME' && (
+                    <Text style={styles.triggerMeta}>
+                      Active from {format(trigger.activationDateTime, 'MMM d, h:mm a')}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Conditions Section */}
         {reminder.conditions.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Conditions ({reminder.conditions.length})
-            </Text>
-            {reminder.conditions.map((condition) => (
-              <View key={condition.id} style={styles.conditionCard}>
-                <Text style={styles.conditionType}>{condition.type}</Text>
-                <Text style={styles.conditionConfig}>
-                  {JSON.stringify(condition.config, null, 2)}
-                </Text>
-              </View>
-            ))}
+            <Text style={styles.sectionTitle}>Only If</Text>
+            <View style={styles.conditionsContainer}>
+              {reminder.conditions.map((condition) => (
+                <View key={condition.id} style={styles.conditionItem}>
+                  <View style={styles.conditionIcon}>
+                    <MaterialIcons name="rule" size={14} color={WarmColors.accent} />
+                  </View>
+                  <Text style={styles.conditionText}>{condition.type}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
-        {/* Metadata Section */}
+        {/* Metadata Cards Grid */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Details</Text>
-
-          <View style={styles.metadataRow}>
-            <Text style={styles.metadataLabel}>Status:</Text>
-            <Text style={[styles.metadataValue, isFired && styles.firedText]}>
-              {reminder.status}
-            </Text>
-          </View>
-
-          <View style={styles.metadataRow}>
-            <Text style={styles.metadataLabel}>Created:</Text>
-            <Text style={styles.metadataValue}>
-              {format(reminder.createdAt, 'MMM d, yyyy h:mm a')}
-            </Text>
-          </View>
-
-          {reminder.firedAt && (
-            <View style={styles.metadataRow}>
-              <Text style={styles.metadataLabel}>Fired:</Text>
-              <Text style={[styles.metadataValue, styles.firedText]}>
-                {format(reminder.firedAt, 'MMM d, yyyy h:mm a')}
+          <View style={styles.metadataGrid}>
+            {/* Created Card */}
+            <View style={styles.metadataCard}>
+              <View style={styles.metadataCardIcon}>
+                <MaterialIcons name="calendar-today" size={18} color={WarmColors.info} />
+              </View>
+              <Text style={styles.metadataCardLabel}>Created</Text>
+              <Text style={styles.metadataCardValue}>
+                {format(reminder.createdAt, 'MMM d, yyyy')}
+              </Text>
+              <Text style={styles.metadataCardTime}>
+                {format(reminder.createdAt, 'h:mm a')}
               </Text>
             </View>
-          )}
 
-          {reminder.expiresAt && (
-            <View style={styles.metadataRow}>
-              <Text style={styles.metadataLabel}>Expires:</Text>
-              <Text style={styles.metadataValue}>
-                {format(reminder.expiresAt, 'MMM d, yyyy h:mm a')}
-              </Text>
-            </View>
-          )}
+            {/* Fired Card (if fired) */}
+            {reminder.firedAt && (
+              <View style={[styles.metadataCard, styles.metadataCardSuccess]}>
+                <View style={styles.metadataCardIcon}>
+                  <MaterialIcons name="check-circle" size={18} color={WarmColors.success} />
+                </View>
+                <Text style={styles.metadataCardLabel}>Completed</Text>
+                <Text style={styles.metadataCardValue}>
+                  {format(reminder.firedAt, 'MMM d, yyyy')}
+                </Text>
+                <Text style={styles.metadataCardTime}>
+                  {format(reminder.firedAt, 'h:mm a')}
+                </Text>
+              </View>
+            )}
 
-          <View style={styles.metadataRow}>
-            <Text style={styles.metadataLabel}>ID:</Text>
-            <Text style={[styles.metadataValue, styles.idText]}>
-              {reminder.id}
-            </Text>
+            {/* Expires Card (if has expiration) */}
+            {reminder.expiresAt && (
+              <View style={styles.metadataCard}>
+                <View style={styles.metadataCardIcon}>
+                  <MaterialIcons name="event-busy" size={18} color={WarmColors.warning} />
+                </View>
+                <Text style={styles.metadataCardLabel}>Expires</Text>
+                <Text style={styles.metadataCardValue}>
+                  {format(reminder.expiresAt, 'MMM d, yyyy')}
+                </Text>
+                <Text style={styles.metadataCardTime}>
+                  {format(reminder.expiresAt, 'h:mm a')}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -339,17 +365,16 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: WarmColors.background,
     paddingTop: 60,
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.compact.md,
+    paddingBottom: Spacing.compact.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: WarmColors.border,
+    borderBottomWidth: 0.5,
+    borderBottomColor: WarmColors.borderLight,
     ...Elevation.level1,
   },
   backButton: {
-    paddingVertical: Spacing.xs,
     width: 44,
     height: 44,
     alignItems: 'center',
@@ -360,7 +385,6 @@ const styles = StyleSheet.create({
     color: WarmColors.textPrimary,
   },
   deleteButton: {
-    paddingVertical: Spacing.xs,
     width: 44,
     height: 44,
     alignItems: 'center',
@@ -382,32 +406,63 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: Spacing.md,
   },
-  statusBadge: {
-    backgroundColor: WarmColors.success,
+  // Hero Section
+  heroSection: {
+    marginBottom: Spacing.lg,
+  },
+  statusPill: {
+    backgroundColor: `${WarmColors.success}15`,
     alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.compact.md,
+    paddingVertical: Spacing.compact.sm,
     borderRadius: BorderRadius.full,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.compact.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.compact.xs,
   },
-  statusBadgeText: {
-    ...Typography.caption,
-    color: WarmColors.textOnPrimary,
+  statusPillText: {
+    ...Typography.tiny,
+    color: WarmColors.success,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
     ...Typography.h2,
     color: WarmColors.textPrimary,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.compact.md,
+    letterSpacing: -0.8,
   },
   description: {
     ...Typography.body,
     color: WarmColors.textSecondary,
-    lineHeight: 24,
+    lineHeight: 26,
+    marginBottom: Spacing.md,
   },
+  quickStats: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.compact.sm,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.compact.xs,
+    backgroundColor: WarmColors.surface,
+    paddingHorizontal: Spacing.compact.md,
+    paddingVertical: Spacing.compact.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 0.5,
+    borderColor: WarmColors.borderLight,
+  },
+  statText: {
+    ...Typography.tiny,
+    color: WarmColors.textSecondary,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+  },
+  // Section
   section: {
     marginTop: Spacing.lg,
   },
@@ -415,98 +470,136 @@ const styles = StyleSheet.create({
     ...Typography.h4,
     color: WarmColors.textPrimary,
     marginBottom: Spacing.md,
+    letterSpacing: -0.3,
   },
-  triggerCard: {
-    backgroundColor: WarmColors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
+  // Timeline for triggers
+  timelineContainer: {
+    paddingLeft: Spacing.compact.sm,
+  },
+  timelineItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderWidth: 1,
-    borderColor: WarmColors.border,
-    ...Elevation.level2,
+    marginBottom: Spacing.md,
   },
-  triggerIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.sm,
+  timelineLeft: {
+    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  timelineDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: `${WarmColors.primary}15`,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.md,
+    borderWidth: 1.5,
+    borderColor: WarmColors.primary,
   },
-  triggerDetails: {
+  timelineLine: {
+    width: 1.5,
     flex: 1,
+    backgroundColor: WarmColors.divider,
+    marginTop: Spacing.compact.xs,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingTop: Spacing.compact.xs,
   },
   triggerLabel: {
-    ...Typography.bodyBold,
+    ...Typography.cardTitle,
     color: WarmColors.textPrimary,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.compact.xs,
   },
   triggerConfig: {
     ...Typography.small,
     color: WarmColors.textSecondary,
-    fontFamily: 'monospace',
-    marginTop: Spacing.xs,
+    lineHeight: 18,
   },
-  triggerActivation: {
-    ...Typography.small,
-    color: WarmColors.primary,
-    marginTop: Spacing.xs,
+  triggerMeta: {
+    ...Typography.tiny,
+    color: WarmColors.textTertiary,
+    marginTop: Spacing.compact.xs,
     fontStyle: 'italic',
   },
-  conditionCard: {
-    backgroundColor: `${WarmColors.accent}20`,
-    borderRadius: BorderRadius.sm,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderLeftWidth: 4,
+  // Conditions
+  conditionsContainer: {
+    gap: Spacing.compact.sm,
+  },
+  conditionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${WarmColors.accent}12`,
+    paddingHorizontal: Spacing.compact.md,
+    paddingVertical: Spacing.compact.sm + 2,
+    borderRadius: BorderRadius.md,
+    borderLeftWidth: 3,
     borderLeftColor: WarmColors.accent,
   },
-  conditionType: {
-    ...Typography.caption,
-    color: WarmColors.textPrimary,
-    marginBottom: Spacing.xs,
+  conditionIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: `${WarmColors.accent}25`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.compact.sm,
   },
-  conditionConfig: {
+  conditionText: {
     ...Typography.small,
-    color: WarmColors.textSecondary,
-    fontFamily: 'monospace',
-  },
-  metadataRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: WarmColors.border,
-  },
-  metadataLabel: {
-    ...Typography.body,
-    color: WarmColors.textSecondary,
+    color: WarmColors.textPrimary,
     fontWeight: '500',
   },
-  metadataValue: {
-    ...Typography.body,
-    color: WarmColors.textPrimary,
+  // Metadata Grid
+  metadataGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.compact.md,
+  },
+  metadataCard: {
     flex: 1,
-    textAlign: 'right',
+    minWidth: 140,
+    backgroundColor: WarmColors.surface,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderWidth: 0.5,
+    borderColor: WarmColors.borderLight,
+    ...Elevation.level1,
   },
-  firedText: {
-    color: WarmColors.success,
-    fontWeight: '600',
+  metadataCardSuccess: {
+    backgroundColor: `${WarmColors.success}08`,
+    borderColor: `${WarmColors.success}30`,
   },
-  idText: {
-    ...Typography.small,
-    fontFamily: 'monospace',
-    fontSize: 10,
+  metadataCardIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: WarmColors.surfaceVariant,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.compact.sm,
   },
+  metadataCardLabel: {
+    ...Typography.tiny,
+    color: WarmColors.textSecondary,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.compact.xs,
+    letterSpacing: 0.5,
+  },
+  metadataCardValue: {
+    ...Typography.cardTitle,
+    color: WarmColors.textPrimary,
+    marginBottom: 2,
+  },
+  metadataCardTime: {
+    ...Typography.tiny,
+    color: WarmColors.textTertiary,
+  },
+  // Reactivate Button
   reactivateButton: {
     backgroundColor: WarmColors.primary,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     alignItems: 'center',
-    marginTop: Spacing.lg,
+    marginTop: Spacing.xl,
     marginBottom: Spacing.xl,
     flexDirection: 'row',
     justifyContent: 'center',
