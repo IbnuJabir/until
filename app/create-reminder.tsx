@@ -620,20 +620,12 @@ export default function CreateReminderScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <View style={styles.handleBar}>
-          <View style={styles.handle} />
-        </View>
-
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.cancelButton}>Cancel</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.cancelButton}>
+            <MaterialIcons name="close" size={24} color={WarmColors.textSecondary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>New Reminder</Text>
-          <TouchableOpacity onPress={handleCreate} disabled={isCreating}>
-            <Text style={[styles.saveButton, isCreating && styles.saveButtonDisabled]}>
-              {isCreating ? 'Creating...' : 'Create'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -695,10 +687,10 @@ export default function CreateReminderScreen() {
                     >
                       <View style={styles.triggerLeft}>
                         <View style={[styles.triggerIconContainer, isSelected && styles.triggerIconContainerSelected]}>
-                          <MaterialIcons 
-                            name={option.icon} 
-                            size={24} 
-                            color={isSelected ? WarmColors.textOnPrimary : WarmColors.primary} 
+                          <MaterialIcons
+                            name={option.icon}
+                            size={18}
+                            color={isSelected ? WarmColors.textOnPrimary : WarmColors.primary}
                           />
                         </View>
                         <View style={styles.triggerTextContainer}>
@@ -869,6 +861,25 @@ export default function CreateReminderScreen() {
                   </View>
                 )}
         </ScrollView>
+
+        {/* Bottom Create Button */}
+        <View style={styles.bottomButtonContainer}>
+          <TouchableOpacity
+            style={[styles.createButton, isCreating && styles.createButtonDisabled]}
+            onPress={handleCreate}
+            disabled={isCreating}
+            activeOpacity={0.8}
+          >
+            {isCreating ? (
+              <>
+                <ActivityIndicator color={WarmColors.textOnPrimary} size="small" />
+                <Text style={styles.createButtonText}>Creating...</Text>
+              </>
+            ) : (
+              <Text style={styles.createButtonText}>Create Reminder</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
 
       {/* Saved Places List Modal */}
@@ -1091,101 +1102,94 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  handleBar: {
-    width: '100%',
-    alignItems: 'center',
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xs,
-  },
-  handle: {
-    width: 36,
-    height: 5,
-    backgroundColor: WarmColors.border,
-    borderRadius: 3,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.compact.md,
+    paddingTop: 60,
+    paddingBottom: Spacing.compact.md,
     backgroundColor: WarmColors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: WarmColors.border,
+    borderBottomWidth: 0.5,
+    borderBottomColor: WarmColors.borderLight,
+    ...Elevation.level1,
   },
   cancelButton: {
-    ...Typography.body,
-    color: WarmColors.primary,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     ...Typography.h4,
     color: WarmColors.textPrimary,
+    letterSpacing: -0.3,
   },
-  saveButton: {
-    ...Typography.bodyBold,
-    color: WarmColors.primary,
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
+  headerSpacer: {
+    width: 44,
   },
   content: {
     flex: 1,
+    paddingBottom: 100, // Space for bottom button
   },
   section: {
     backgroundColor: WarmColors.background,
     padding: Spacing.md,
-    marginTop: Spacing.md,
+    marginTop: Spacing.compact.md,
   },
   sectionLabel: {
-    ...Typography.bodyBold,
+    ...Typography.h4,
     color: WarmColors.textPrimary,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.compact.md,
+    letterSpacing: -0.3,
   },
   optional: {
-    ...Typography.caption,
+    ...Typography.tiny,
     color: WarmColors.textTertiary,
     fontWeight: '400',
+    textTransform: 'uppercase',
   },
   sectionHint: {
-    ...Typography.caption,
+    ...Typography.tiny,
     color: WarmColors.textSecondary,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.compact.md,
+    lineHeight: 16,
   },
   titleInput: {
     ...Typography.body,
     color: WarmColors.textPrimary,
-    padding: Spacing.md,
-    backgroundColor: WarmColors.surfaceVariant,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: WarmColors.border,
+    padding: Spacing.compact.md,
+    backgroundColor: WarmColors.surface,
+    borderRadius: BorderRadius.md,
+    borderWidth: 0.5,
+    borderColor: WarmColors.borderLight,
   },
   descriptionInput: {
     ...Typography.body,
     color: WarmColors.textPrimary,
-    padding: Spacing.md,
-    backgroundColor: WarmColors.surfaceVariant,
-    borderRadius: BorderRadius.sm,
+    padding: Spacing.compact.md,
+    backgroundColor: WarmColors.surface,
+    borderRadius: BorderRadius.md,
     minHeight: 80,
-    borderWidth: 1,
-    borderColor: WarmColors.border,
+    borderWidth: 0.5,
+    borderColor: WarmColors.borderLight,
   },
   triggerOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: Spacing.md,
-    backgroundColor: WarmColors.surfaceVariant,
+    padding: Spacing.compact.md,
+    backgroundColor: WarmColors.surface,
     borderRadius: BorderRadius.md,
-    marginBottom: Spacing.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    marginBottom: Spacing.compact.md,
+    borderWidth: 0.5,
+    borderColor: WarmColors.borderLight,
     ...Elevation.level1,
   },
   triggerOptionSelected: {
-    backgroundColor: `${WarmColors.primary}15`,
+    backgroundColor: `${WarmColors.primary}08`,
     borderColor: WarmColors.primary,
+    borderWidth: 1.5,
   },
   triggerOptionLocked: {
     opacity: 0.6,
@@ -1200,13 +1204,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   triggerIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: `${WarmColors.primary}20`,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: `${WarmColors.primary}15`,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.md,
+    marginRight: Spacing.compact.sm + 2,
   },
   triggerIconContainerSelected: {
     backgroundColor: WarmColors.primary,
@@ -1215,29 +1219,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   triggerLabel: {
-    ...Typography.bodyBold,
+    ...Typography.cardTitle,
     color: WarmColors.textPrimary,
   },
   selectedInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.xs,
+    marginTop: Spacing.compact.xs,
     gap: 4,
   },
   proLabel: {
-    ...Typography.small,
+    ...Typography.tiny,
     color: WarmColors.accent,
     fontWeight: '600',
+    textTransform: 'uppercase',
   },
   selectedAppLabel: {
-    ...Typography.small,
+    ...Typography.tiny,
     color: WarmColors.primary,
     fontWeight: '600',
   },
   unavailableLabel: {
-    ...Typography.small,
+    ...Typography.tiny,
     color: WarmColors.warning,
     fontWeight: '600',
+    textTransform: 'uppercase',
   },
   triggerRight: {
     marginLeft: Spacing.md,
@@ -1485,5 +1491,37 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: WarmColors.error,
     fontWeight: '600',
+  },
+  // Bottom Button
+  bottomButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md + 20, // Extra padding for safe area
+    backgroundColor: WarmColors.background,
+    borderTopWidth: 0.5,
+    borderTopColor: WarmColors.borderLight,
+    ...Elevation.level3,
+  },
+  createButton: {
+    backgroundColor: WarmColors.primary,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    ...Elevation.level2,
+  },
+  createButtonDisabled: {
+    opacity: 0.6,
+  },
+  createButtonText: {
+    ...Typography.bodyBold,
+    color: WarmColors.textOnPrimary,
+    fontSize: 17,
   },
 });
