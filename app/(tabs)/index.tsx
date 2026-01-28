@@ -155,6 +155,12 @@ export default function RemindersScreen() {
   const activeReminders = reminders.filter((r) => r.status === ReminderStatus.WAITING);
   const firedReminders = reminders.filter((r) => r.status === ReminderStatus.FIRED);
 
+  // Sort reminders: uncompleted first (newest to oldest), then completed (newest to oldest)
+  const sortedReminders = [
+    ...activeReminders.sort((a, b) => b.createdAt - a.createdAt),
+    ...firedReminders.sort((a, b) => b.createdAt - a.createdAt),
+  ];
+
   const handleReminderPress = (id: string) => {
     router.push(`/reminder-detail?id=${id}` as any);
   };
@@ -256,20 +262,20 @@ export default function RemindersScreen() {
 
       {/* Reminder List */}
       <FlatList
-        data={reminders}
+        data={sortedReminders}
         renderItem={renderReminderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
+          <RefreshControl
+            refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={WarmColors.primary}
           />
         }
         ListHeaderComponent={
-          reminders.length > 0 ? (
+          sortedReminders.length > 0 ? (
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
                 Your Reminders
