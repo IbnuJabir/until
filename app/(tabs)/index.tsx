@@ -3,23 +3,24 @@
  * Displays all reminders grouped by status
  */
 
+import { Reminder, ReminderStatus } from '@/app/src/domain';
+import { useReminderStore } from '@/app/src/store/reminderStore';
+import { BatchActionBar } from '@/app/src/ui/BatchActionBar';
+import { SwipeableReminderCard } from '@/app/src/ui/SwipeableReminderCard';
+import { Toast } from '@/app/src/utils/Toast';
+import { BorderRadius, Elevation, Spacing, Typography, WarmColors } from '@/constants/theme';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
   Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useReminderStore } from '@/app/src/store/reminderStore';
-import { Reminder, ReminderStatus, TriggerType, isReminderActive } from '@/app/src/domain';
-import { format } from 'date-fns';
-import { Toast } from '@/app/src/utils/Toast';
-import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 
 export default function RemindersScreen() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function RemindersScreen() {
   const {
     reminders,
     deleteReminder,
+    deleteMultipleReminders,
     loadFromStorage,
     isLoading,
     entitlements,
@@ -36,6 +38,8 @@ export default function RemindersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Load reminders on mount
   useEffect(() => {
@@ -68,8 +72,63 @@ export default function RemindersScreen() {
           onPress: async () => {
             try {
               await deleteReminder(id);
+              setToastMessage('Reminder deleted');
+              setShowToast(true);
             } catch (error) {
               Alert.alert('Error', 'Failed to delete reminder');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleToggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedIds(new Set());
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedIds(new Set(reminders.map((r) => r.id)));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBatchDelete = () => {
+    const count = selectedIds.size;
+    if (count === 0) return;
+
+    Alert.alert(
+      'Delete Reminders',
+      `Are you sure you want to delete ${count} reminder${count > 1 ? 's' : ''}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteMultipleReminders(Array.from(selectedIds));
+              setToastMessage(`${count} reminder${count > 1 ? 's' : ''} deleted`);
+              setShowToast(true);
+              setIsSelectionMode(false);
+              setSelectedIds(new Set());
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete reminders');
             }
           },
         },
@@ -100,90 +159,16 @@ export default function RemindersScreen() {
     router.push(`/reminder-detail?id=${id}` as any);
   };
 
-  const getTriggerIcon = (type: TriggerType): keyof typeof MaterialIcons.glyphMap => {
-    switch (type) {
-      case TriggerType.PHONE_UNLOCK:
-        return 'smartphone';
-      case TriggerType.LOCATION_ENTER:
-        return 'location-on';
-      case TriggerType.CHARGING_STARTED:
-        return 'battery-charging-full';
-      case TriggerType.APP_OPENED:
-        return 'apps';
-      case TriggerType.SCHEDULED_TIME:
-      case TriggerType.TIME_WINDOW:
-        return 'schedule';
-      default:
-        return 'notifications';
-    }
-  };
-
   const renderReminderItem = ({ item }: { item: Reminder }) => {
-    const isFired = item.status === ReminderStatus.FIRED;
-    const primaryTrigger = item.triggers[0];
-    const triggerIcon = primaryTrigger ? getTriggerIcon(primaryTrigger.type) : 'notifications';
-
     return (
-      <TouchableOpacity
-        style={[styles.reminderCard, isFired && styles.reminderCardFired]}
+      <SwipeableReminderCard
+        item={item}
         onPress={() => handleReminderPress(item.id)}
-        onLongPress={() => handleDeleteReminder(item.id, item.title)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.reminderContent}>
-          <View style={[styles.reminderIconContainer, !isFired && styles.reminderIconContainerActive]}>
-            <MaterialIcons 
-              name={triggerIcon} 
-              size={24} 
-              color={isFired ? WarmColors.textTertiary : WarmColors.primary} 
-            />
-          </View>
-          
-          <View style={styles.reminderTextContainer}>
-            <View style={styles.reminderHeader}>
-              <Text style={[styles.reminderTitle, isFired && styles.textFired]} numberOfLines={2}>
-                {item.title}
-              </Text>
-              {isFired && (
-                <View style={styles.firedBadge}>
-                  <MaterialIcons name="check-circle" size={14} color={WarmColors.success} />
-                  <Text style={styles.firedBadgeText}>Fired</Text>
-                </View>
-              )}
-            </View>
-
-            {item.description && (
-              <Text style={[styles.reminderDescription, isFired && styles.textFired]} numberOfLines={2}>
-                {item.description}
-              </Text>
-            )}
-
-            <View style={styles.reminderMeta}>
-              <View style={styles.metaItem}>
-                <MaterialIcons name="notifications-active" size={14} color={WarmColors.textSecondary} />
-                <Text style={[styles.metaText, isFired && styles.textFired]}>
-                  {item.triggers.length} trigger{item.triggers.length !== 1 ? 's' : ''}
-                </Text>
-              </View>
-              <View style={styles.metaItem}>
-                <MaterialIcons name="calendar-today" size={14} color={WarmColors.textSecondary} />
-                <Text style={[styles.metaText, isFired && styles.textFired]}>
-                  {format(item.createdAt, 'MMM d')}
-                </Text>
-              </View>
-            </View>
-
-            {isFired && item.firedAt && (
-              <View style={styles.firedAtContainer}>
-                <MaterialIcons name="check-circle" size={12} color={WarmColors.success} />
-                <Text style={styles.firedAtText}>
-                  Fired {format(item.firedAt, 'MMM d, h:mm a')}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
+        onDelete={() => handleDeleteReminder(item.id, item.title)}
+        isSelectionMode={isSelectionMode}
+        isSelected={selectedIds.has(item.id)}
+        onToggleSelect={() => handleToggleSelect(item.id)}
+      />
     );
   };
 
@@ -219,18 +204,54 @@ export default function RemindersScreen() {
                 {entitlements.hasProAccess ? 'Pro' : 'Free'}
               </Text>
             </View>
-            <Text style={styles.headerSubtitle}>
+            {/* <Text style={styles.headerSubtitle}>
               {activeReminders.length} active
-            </Text>
+            </Text> */}
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.voiceButton}
-          onPress={() => router.push('/voice-reminder' as any)}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="mic" size={20} color={WarmColors.textOnPrimary} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {reminders.length > 0 && isSelectionMode && (
+            <>
+              <TouchableOpacity
+                style={styles.selectAllButton}
+                onPress={selectedIds.size === reminders.length ? handleDeselectAll : handleSelectAll}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.selectAllButtonText}>
+                  {selectedIds.size === reminders.length ? 'Deselect All' : 'Select All'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.doneButton}
+                onPress={handleToggleSelectionMode}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {!isSelectionMode && (
+            <>
+              {reminders.length > 0 && (
+                <TouchableOpacity
+                  style={styles.selectButton}
+                  onPress={handleToggleSelectionMode}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="check-circle-outline" size={20} color={WarmColors.primary} />
+                  <Text style={styles.selectButtonText}>Select</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.voiceButton}
+                onPress={() => router.push('/voice-reminder' as any)}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="mic" size={20} color={WarmColors.textOnPrimary} />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
 
       {/* Reminder List */}
@@ -262,7 +283,7 @@ export default function RemindersScreen() {
       />
 
       {/* FAB - Floating Action Button */}
-      {reminders.length > 0 && (
+      {reminders.length > 0 && !isSelectionMode && (
         <TouchableOpacity
           style={styles.fab}
           onPress={handleCreateReminder}
@@ -271,6 +292,13 @@ export default function RemindersScreen() {
           <MaterialIcons name="add" size={28} color={WarmColors.textOnPrimary} />
         </TouchableOpacity>
       )}
+
+      {/* Batch Action Bar */}
+      <BatchActionBar
+        visible={isSelectionMode}
+        selectedCount={selectedIds.size}
+        onDelete={handleBatchDelete}
+      />
 
       {/* Toast Notification */}
       <Toast
@@ -300,6 +328,9 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   headerTitle: {
     ...Typography.h2,
@@ -498,5 +529,55 @@ const styles = StyleSheet.create({
   emptyStateButtonText: {
     ...Typography.bodyBold,
     color: WarmColors.textOnPrimary,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  selectedCountContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  selectedCountText: {
+    ...Typography.caption,
+    color: WarmColors.textPrimary,
+    fontWeight: '700',
+  },
+  selectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    backgroundColor: `${WarmColors.primary}15`,
+  },
+  selectButtonText: {
+    ...Typography.caption,
+    color: WarmColors.primary,
+    fontWeight: '600',
+  },
+  selectAllButton: {
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: WarmColors.surfaceVariant,
+  },
+  selectAllButtonText: {
+    ...Typography.caption,
+    color: WarmColors.textPrimary,
+    fontWeight: '600',
+  },
+  doneButton: {
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: WarmColors.primary,
+  },
+  doneButtonText: {
+    ...Typography.caption,
+    color: WarmColors.textOnPrimary,
+    fontWeight: '600',
   },
 });

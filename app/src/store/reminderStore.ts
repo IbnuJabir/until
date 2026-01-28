@@ -51,6 +51,7 @@ interface ReminderStore {
   updateReminder: (id: string, updates: Partial<Reminder>) => Promise<void>;
   updateReminderStatus: (id: string, status: ReminderStatus) => Promise<void>;
   deleteReminder: (id: string) => Promise<void>;
+  deleteMultipleReminders: (ids: string[]) => Promise<void>;
   fireReminder: (id: string) => Promise<void>;
 
   // Saved place actions
@@ -303,6 +304,66 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to delete reminder',
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Delete multiple reminders at once (batch delete)
+   */
+  deleteMultipleReminders: async (ids: string[]) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const { deleteReminder: dbDeleteReminder } = await import(
+        '../storage/database'
+      );
+
+      const currentReminders = get().reminders;
+      const remindersToDelete = currentReminders.filter((r) => ids.includes(r.id));
+      const remainingReminders = currentReminders.filter((r) => !ids.includes(r.id));
+
+      // Cleanup for each reminder
+      for (const reminder of remindersToDelete) {
+        // Unregister geofences for location triggers
+        for (const trigger of reminder.triggers) {
+          if (trigger.type === 'LOCATION_ENTER') {
+            const { unregisterGeofence } = await import('../native-bridge/LocationBridge');
+
+            try {
+              await unregisterGeofence(`reminder_${reminder.id}`);
+              console.log(`[Store] Unregistered geofence for reminder: ${reminder.title}`);
+            } catch (error) {
+              console.warn('[Store] Failed to unregister geofence:', error);
+            }
+          }
+        }
+
+        // Cancel scheduled notifications
+        if (reminder.notificationId) {
+          const Notifications = await import('expo-notifications');
+
+          try {
+            await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
+            console.log(`[Store] Cancelled scheduled notification for reminder: ${reminder.title}`);
+          } catch (error) {
+            console.warn('[Store] Failed to cancel scheduled notification:', error);
+          }
+        }
+
+        // Delete from database
+        await dbDeleteReminder(reminder.id);
+      }
+
+      set({
+        reminders: remainingReminders,
+        isLoading: false,
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to delete reminders',
         isLoading: false,
       });
       throw error;
