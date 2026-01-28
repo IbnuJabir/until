@@ -75,74 +75,68 @@ export function SwipeableReminderCard({
         ]}
         onPress={handlePress}
         onLongPress={onDelete}
-        activeOpacity={0.8}
+        activeOpacity={0.7}
       >
-          <View style={styles.reminderContent}>
-            {/* Selection Checkbox */}
-            {isSelectionMode && (
-              <View style={styles.checkboxContainer}>
-                <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                  {isSelected && (
-                    <MaterialIcons name="check" size={18} color={WarmColors.textOnPrimary} />
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* Icon */}
-            <View style={[styles.reminderIconContainer, !isFired && styles.reminderIconContainerActive]}>
-              <MaterialIcons
-                name={triggerIcon}
-                size={24}
-                color={isFired ? WarmColors.textTertiary : WarmColors.primary}
-              />
-            </View>
-
-            {/* Content */}
-            <View style={styles.reminderTextContainer}>
-              <View style={styles.reminderHeader}>
-                <Text style={[styles.reminderTitle, isFired && styles.textFired]} numberOfLines={2}>
-                  {item.title}
-                </Text>
-                {isFired && (
-                  <View style={styles.firedBadge}>
-                    <MaterialIcons name="check-circle" size={14} color={WarmColors.success} />
-                    <Text style={styles.firedBadgeText}>Fired</Text>
-                  </View>
+        <View style={styles.reminderContent}>
+          {/* Selection Checkbox */}
+          {isSelectionMode && (
+            <View style={styles.checkboxContainer}>
+              <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                {isSelected && (
+                  <MaterialIcons name="check" size={16} color={WarmColors.textOnPrimary} />
                 )}
               </View>
+            </View>
+          )}
 
-              {item.description && (
-                <Text style={[styles.reminderDescription, isFired && styles.textFired]} numberOfLines={2}>
-                  {item.description}
-                </Text>
+          {/* Compact Icon */}
+          <View style={[styles.iconContainer, !isFired && styles.iconContainerActive]}>
+            <MaterialIcons
+              name={triggerIcon}
+              size={18}
+              color={isFired ? WarmColors.textTertiary : WarmColors.primary}
+            />
+          </View>
+
+          {/* Content */}
+          <View style={styles.contentContainer}>
+            <View style={styles.headerRow}>
+              <Text style={[styles.title, isFired && styles.titleFired]} numberOfLines={1}>
+                {item.title}
+              </Text>
+              {isFired && (
+                <View style={styles.firedBadge}>
+                  <MaterialIcons name="check-circle" size={10} color={WarmColors.success} />
+                </View>
               )}
+            </View>
 
-              <View style={styles.reminderMeta}>
-                <View style={styles.metaItem}>
-                  <MaterialIcons name="notifications-active" size={14} color={WarmColors.textSecondary} />
-                  <Text style={[styles.metaText, isFired && styles.textFired]}>
-                    {item.triggers.length} trigger{item.triggers.length !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <MaterialIcons name="calendar-today" size={14} color={WarmColors.textSecondary} />
-                  <Text style={[styles.metaText, isFired && styles.textFired]}>
-                    {format(item.createdAt, 'MMM d')}
-                  </Text>
-                </View>
+            {/* Compact metadata row */}
+            <View style={styles.metaRow}>
+              <View style={styles.metaItem}>
+                <Text style={[styles.metaText, isFired && styles.metaTextFired]}>
+                  {item.triggers.length} trigger{item.triggers.length !== 1 ? 's' : ''}
+                </Text>
               </View>
-
+              <View style={styles.metaDivider} />
+              <View style={styles.metaItem}>
+                <Text style={[styles.metaText, isFired && styles.metaTextFired]}>
+                  {format(item.createdAt, 'MMM d')}
+                </Text>
+              </View>
               {isFired && item.firedAt && (
-                <View style={styles.firedAtContainer}>
-                  <MaterialIcons name="check-circle" size={12} color={WarmColors.success} />
-                  <Text style={styles.firedAtText}>
-                    Fired {format(item.firedAt, 'MMM d, h:mm a')}
-                  </Text>
-                </View>
+                <>
+                  <View style={styles.metaDivider} />
+                  <View style={styles.metaItem}>
+                    <Text style={styles.firedAtText}>
+                      {format(item.firedAt, 'h:mm a')}
+                    </Text>
+                  </View>
+                </>
               )}
             </View>
           </View>
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -150,38 +144,38 @@ export function SwipeableReminderCard({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.compact.md,
   },
   reminderCard: {
     backgroundColor: WarmColors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: WarmColors.border,
-    ...Elevation.level2,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.compact.md,
+    borderWidth: 0.5,
+    borderColor: WarmColors.borderLight,
+    ...Elevation.level1,
   },
   reminderCardFired: {
-    backgroundColor: WarmColors.surfaceVariant,
+    backgroundColor: WarmColors.surfaceWarm,
     borderColor: WarmColors.divider,
-    opacity: 0.85,
   },
   reminderCardSelected: {
     borderColor: WarmColors.primary,
-    borderWidth: 2,
-    backgroundColor: `${WarmColors.primary}08`,
+    borderWidth: 1.5,
+    backgroundColor: `${WarmColors.primary}05`,
   },
   reminderContent: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   checkboxContainer: {
     justifyContent: 'center',
-    marginRight: Spacing.md,
+    marginRight: Spacing.compact.sm + 2,
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
     borderColor: WarmColors.border,
     justifyContent: 'center',
     alignItems: 'center',
@@ -191,76 +185,73 @@ const styles = StyleSheet.create({
     backgroundColor: WarmColors.primary,
     borderColor: WarmColors.primary,
   },
-  reminderIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.md,
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: WarmColors.surfaceVariant,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.md,
+    marginRight: Spacing.compact.sm + 2,
   },
-  reminderIconContainerActive: {
-    backgroundColor: `${WarmColors.primary}15`,
+  iconContainerActive: {
+    backgroundColor: `${WarmColors.primary}12`,
   },
-  reminderTextContainer: {
+  contentContainer: {
     flex: 1,
+    justifyContent: 'center',
   },
-  reminderHeader: {
+  headerRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.compact.xs,
   },
-  reminderTitle: {
-    ...Typography.bodyBold,
+  title: {
+    ...Typography.cardTitle,
     color: WarmColors.textPrimary,
     flex: 1,
     marginRight: Spacing.sm,
   },
+  titleFired: {
+    color: WarmColors.textSecondary,
+  },
   firedBadge: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: `${WarmColors.success}18`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: `${WarmColors.success}15`,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.sm,
-    gap: 4,
-  },
-  firedBadgeText: {
-    ...Typography.small,
-    color: WarmColors.success,
-    fontWeight: '600',
-  },
-  reminderDescription: {
-    ...Typography.body,
-    color: WarmColors.textSecondary,
-    marginBottom: Spacing.sm,
-  },
-  reminderMeta: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginTop: Spacing.xs,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
   },
   metaText: {
-    ...Typography.small,
+    ...Typography.tiny,
     color: WarmColors.textSecondary,
+    textTransform: 'uppercase',
   },
-  firedAtContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-    gap: 4,
+  metaTextFired: {
+    color: WarmColors.textTertiary,
+  },
+  metaDivider: {
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: WarmColors.textTertiary,
+    marginHorizontal: Spacing.compact.sm,
   },
   firedAtText: {
-    ...Typography.small,
+    ...Typography.tiny,
     color: WarmColors.success,
-    fontWeight: '500',
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   textFired: {
     color: WarmColors.textTertiary,

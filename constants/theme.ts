@@ -5,48 +5,50 @@
 
 import { Platform } from 'react-native';
 
-// Warm Color Palette
+// Warm Color Palette - Refined Scandinavian Warmth
 export const WarmColors = {
-  // Primary - Orange
-  primary: '#FF6B35',
-  primaryLight: '#FF8C42',
-  primaryDark: '#E55A2B',
-  
-  // Secondary - Pink
-  secondary: '#FF6B9D',
-  secondaryLight: '#FF8FA3',
-  secondaryDark: '#E55A8A',
-  
-  // Accent - Amber
-  accent: '#FFB84D',
-  accentLight: '#FFD93D',
-  accentDark: '#E5A642',
-  
-  // Backgrounds
-  background: '#FFFFFF',
-  backgroundLight: '#FFF8F0',
+  // Primary - Terracotta/Warm Orange
+  primary: '#E87461',
+  primaryLight: '#F19B8E',
+  primaryDark: '#D45F4D',
+
+  // Secondary - Dusty Rose
+  secondary: '#E88C9C',
+  secondaryLight: '#F2A8B4',
+  secondaryDark: '#D47184',
+
+  // Accent - Warm Sand/Amber
+  accent: '#F4A261',
+  accentLight: '#F7BC88',
+  accentDark: '#E08A47',
+
+  // Backgrounds - Softer, warmer whites
+  background: '#FEFDFB',
+  backgroundLight: '#FAF8F5',
   surface: '#FFFFFF',
-  surfaceVariant: '#FFF5E6',
-  
-  // Text
-  textPrimary: '#1C1C1E',
-  textSecondary: '#666666',
-  textTertiary: '#999999',
+  surfaceVariant: '#F9F5F0',
+  surfaceWarm: '#FFF9F4',
+
+  // Text - More refined hierarchy
+  textPrimary: '#2A2826',
+  textSecondary: '#6B6661',
+  textTertiary: '#A39E98',
   textOnPrimary: '#FFFFFF',
-  
-  // Status
-  success: '#34C759',
-  error: '#FF3B30',
-  warning: '#FF9500',
-  info: '#007AFF',
-  
-  // Borders & Dividers
-  border: '#E0E0E0',
-  divider: '#F0F0F0',
-  
+
+  // Status - Softer, more harmonious
+  success: '#52B788',
+  error: '#E76F51',
+  warning: '#F4A261',
+  info: '#4A90E2',
+
+  // Borders & Dividers - Subtler
+  border: '#EAE6E1',
+  divider: '#F2EFE9',
+  borderLight: '#F5F2ED',
+
   // Overlay
-  overlay: 'rgba(0, 0, 0, 0.5)',
-  overlayLight: 'rgba(0, 0, 0, 0.3)',
+  overlay: 'rgba(42, 40, 38, 0.5)',
+  overlayLight: 'rgba(42, 40, 38, 0.25)',
 };
 
 // Material Design 3 Elevation
@@ -103,6 +105,13 @@ export const Spacing = {
   lg: 24,
   xl: 32,
   xxl: 48,
+  // Compact variants for denser layouts
+  compact: {
+    xs: 3,
+    sm: 6,
+    md: 12,
+    lg: 18,
+  },
 };
 
 // Border Radius
@@ -152,6 +161,13 @@ export const Typography = {
     letterSpacing: 0,
     lineHeight: 24,
   },
+  // Compact variant for card titles
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    letterSpacing: -0.2,
+    lineHeight: 20,
+  },
   caption: {
     fontSize: 14,
     fontWeight: '500' as const,
@@ -163,6 +179,13 @@ export const Typography = {
     fontWeight: '400' as const,
     letterSpacing: 0.2,
     lineHeight: 16,
+  },
+  // Extra small for metadata
+  tiny: {
+    fontSize: 11,
+    fontWeight: '500' as const,
+    letterSpacing: 0.3,
+    lineHeight: 14,
   },
 };
 

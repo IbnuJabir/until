@@ -370,11 +370,11 @@ const styles = StyleSheet.create({
     ...Elevation.level2,
   },
   listContent: {
-    padding: Spacing.md,
+    padding: Spacing.compact.md,
     paddingBottom: 100, // Space for FAB
   },
   sectionHeader: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.compact.md,
   },
   sectionTitle: {
     ...Typography.h4,
