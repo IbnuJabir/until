@@ -9,7 +9,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { Reminder, Trigger, Condition, PaymentEntitlement, SavedPlace } from '../domain';
+import { Condition, PaymentEntitlement, Reminder, SavedPlace, Trigger } from '../domain';
 
 const DATABASE_NAME = 'until.db';
 
@@ -46,6 +46,7 @@ export async function initDatabase(): Promise<void> {
       reminder_id TEXT NOT NULL,
       type TEXT NOT NULL,
       config TEXT,
+      activation_date_time INTEGER,
       FOREIGN KEY (reminder_id) REFERENCES reminders(id) ON DELETE CASCADE
     );
   `);
@@ -147,13 +148,14 @@ export async function saveReminder(reminder: Reminder): Promise<void> {
     // Insert triggers
     for (const trigger of reminder.triggers) {
       db.runSync(
-        `INSERT INTO triggers (id, reminder_id, type, config)
-         VALUES (?, ?, ?, ?);`,
+        `INSERT INTO triggers (id, reminder_id, type, config, activation_date_time)
+         VALUES (?, ?, ?, ?, ?);`,
         [
           trigger.id,
           reminder.id,
           trigger.type,
           trigger.config ? JSON.stringify(trigger.config) : null,
+          trigger.activationDateTime || null,
         ]
       );
     }
@@ -203,6 +205,7 @@ export async function loadAllReminders(): Promise<Reminder[]> {
         id: triggerRow.id,
         type: triggerRow.type,
         config: triggerRow.config ? JSON.parse(triggerRow.config) : null,
+        activationDateTime: triggerRow.activation_date_time || undefined,
       }));
 
       // Load conditions for this reminder
@@ -282,6 +285,7 @@ export async function getReminderById(id: string): Promise<Reminder | null> {
       id: triggerRow.id,
       type: triggerRow.type,
       config: triggerRow.config ? JSON.parse(triggerRow.config) : null,
+      activationDateTime: triggerRow.activation_date_time || undefined,
     }));
 
     // Load conditions

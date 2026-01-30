@@ -100,7 +100,18 @@ export function useScreenTime(): UseScreenTimeResult {
     setError(null);
 
     try {
-      const status = await requestScreenTimePermission();
+      // Add timeout protection to prevent stuck loading state
+      const timeoutPromise = new Promise<ScreenTimeAuthorizationStatus>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Permission request timed out after 30 seconds. Please try again.'));
+        }, 30000);
+      });
+
+      const status = await Promise.race([
+        requestScreenTimePermission(),
+        timeoutPromise
+      ]);
+
       setAuthStatus(status);
 
       if (status !== 'approved') {
@@ -129,11 +140,22 @@ export function useScreenTime(): UseScreenTimeResult {
     setError(null);
 
     try {
-      const result = await presentAppPicker();
+      // Add timeout protection to prevent stuck loading state
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('App picker timed out after 30 seconds. Please try again.'));
+        }, 30000);
+      });
+
+      const result = await Promise.race([
+        presentAppPicker(),
+        timeoutPromise
+      ]);
+
       console.log('[useScreenTime] App selection complete:', result);
 
       // Update has apps selected state
-      if (result.selectedCount > 0) {
+      if (result && result.selectedCount > 0) {
         setHasAppsSelected(true);
       }
 

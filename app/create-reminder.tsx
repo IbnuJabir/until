@@ -193,8 +193,21 @@ export default function CreateReminderScreen() {
   };
 
   const handleAppTriggerSelection = async () => {
-    // Check if ScreenTime module is available
-    if (!screenTime.isAuthorized && screenTime.authStatus === 'unknown') {
+    console.log('[CreateReminder] handleAppTriggerSelection called');
+    console.log('[CreateReminder] Auth status:', screenTime.authStatus);
+    console.log('[CreateReminder] Is authorized:', screenTime.isAuthorized);
+    console.log('[CreateReminder] Is loading:', screenTime.isLoading);
+    console.log('[CreateReminder] Error:', screenTime.error);
+
+    // Wait for loading to finish before proceeding
+    if (screenTime.isLoading) {
+      console.log('[CreateReminder] Still loading, waiting...');
+      return;
+    }
+
+    // Check if ScreenTime module is available (only if error exists or status is truly unknown after loading)
+    if (screenTime.authStatus === 'unknown' && screenTime.error) {
+      console.log('[CreateReminder] Module not available');
       Alert.alert(
         'Feature Not Available',
         'Screen Time monitoring is not available on this device. This feature requires native iOS modules that need to be built with Xcode.\n\nPlease build the app using Xcode or use the npm script: npm run run:ios:device',
@@ -205,6 +218,7 @@ export default function CreateReminderScreen() {
 
     // Step 1: Check if already authorized
     if (!screenTime.isAuthorized) {
+      console.log('[CreateReminder] Not authorized, showing permission alert');
       // Request permission first
       Alert.alert(
         'Screen Time Permission Required',
@@ -214,8 +228,10 @@ export default function CreateReminderScreen() {
           {
             text: 'Continue',
             onPress: async () => {
+              console.log('[CreateReminder] User tapped Continue, requesting permission...');
               try {
                 const status = await screenTime.requestPermission();
+                console.log('[CreateReminder] Permission result:', status);
 
                 // After permission, check if authorized and continue
                 if (status === 'approved') {
@@ -243,14 +259,19 @@ export default function CreateReminderScreen() {
     }
 
     // Step 2: Show app picker
+    console.log('[CreateReminder] Already authorized, showing app picker');
     await showAppPickerFlow();
   };
 
   const showAppPickerFlow = async () => {
+    console.log('[CreateReminder] showAppPickerFlow called');
     try {
+      console.log('[CreateReminder] Calling screenTime.showAppPicker()...');
       const result = await screenTime.showAppPicker();
+      console.log('[CreateReminder] App picker result:', result);
 
       if (result && result.selectedCount > 0) {
+        console.log('[CreateReminder] User selected', result.selectedCount, 'items');
         // User selected apps successfully
         setSelectedAppCount(result.selectedCount);
         setSelectedAppDetails({
@@ -538,6 +559,16 @@ export default function CreateReminderScreen() {
       // Calculate activation datetime for event-based triggers
       const activationDateTime = calculateActivationDateTime();
 
+      console.log('[CreateReminder] ========================================');
+      console.log('[CreateReminder] Creating reminder with activation settings:');
+      console.log('[CreateReminder]   activationDate:', activationDate);
+      console.log('[CreateReminder]   activationTime:', activationTime);
+      console.log('[CreateReminder]   calculated activationDateTime:', activationDateTime);
+      if (activationDateTime) {
+        console.log('[CreateReminder]   activationDateTime (readable):', new Date(activationDateTime).toLocaleString());
+      }
+      console.log('[CreateReminder] ========================================');
+
       // Create reminder first to get its ID
       const reminder = createReminder(title.trim(), [], [], description.trim());
 
@@ -569,6 +600,16 @@ export default function CreateReminderScreen() {
       // Update reminder with triggers
       reminder.triggers = triggers;
 
+      console.log('[CreateReminder] Created triggers:');
+      triggers.forEach((trigger, index) => {
+        console.log(`[CreateReminder]   Trigger ${index + 1}:`);
+        console.log(`[CreateReminder]     type: ${trigger.type}`);
+        console.log(`[CreateReminder]     activationDateTime: ${trigger.activationDateTime}`);
+        if (trigger.activationDateTime) {
+          console.log(`[CreateReminder]     activationDateTime (readable): ${new Date(trigger.activationDateTime).toLocaleString()}`);
+        }
+      });
+
       // Log location details if location trigger is selected
       // if (selectedTriggers.includes(TriggerType.LOCATION_ENTER) && selectedLocation) {
       //   console.log('=================================================');
@@ -586,19 +627,62 @@ export default function CreateReminderScreen() {
 
       // Start monitoring for APP_OPENED triggers with unique activity name
       if (selectedTriggers.includes(TriggerType.APP_OPENED)) {
+        console.log('=================================================');
+        console.log('[CreateReminder] 📱 Setting up APP_OPENED monitoring');
+        console.log('[CreateReminder] Reminder ID:', reminder.id);
+        console.log('[CreateReminder] Reminder title:', reminder.title);
+        console.log('[CreateReminder] Reminder status:', reminder.status);
+
         const appTrigger = triggers.find(t => t.type === TriggerType.APP_OPENED);
         if (appTrigger && appTrigger.config) {
-          const config = appTrigger.config as { activityName?: string };
+          const config = appTrigger.config as { activityName?: string; appName?: string };
+          console.log('[CreateReminder] Trigger config:', JSON.stringify(config));
+
           if (config.activityName) {
-            console.log(`[CreateReminder] Starting monitoring with activity name: ${config.activityName}`);
+            console.log(`[CreateReminder] 🚀 Starting DeviceActivity monitoring...`);
+            console.log(`[CreateReminder] Activity name: ${config.activityName}`);
+            console.log(`[CreateReminder] Selected apps: ${config.appName || 'unknown'}`);
+
             const result = await screenTime.startMonitoring(config.activityName);
+
+            console.log('[CreateReminder] Monitoring result:', result);
             if (result.success) {
-              console.log(`[CreateReminder] ✅ Monitoring started for: ${config.activityName}`);
+              console.log(`[CreateReminder] ✅ Monitoring started successfully!`);
+              console.log(`[CreateReminder] Activity name: ${result.activityName || config.activityName}`);
+
+              // Check extension status
+              const { checkExtensionStatus } = await import('@/app/src/native-bridge/ScreenTimeBridge');
+              const extensionStatus = await checkExtensionStatus();
+
+              console.log('[CreateReminder] 🔍 Checking DeviceActivityMonitor extension...');
+              console.log('[CreateReminder] Extension status:', JSON.stringify(extensionStatus, null, 2));
+
+              if (!extensionStatus.alive) {
+                console.error('[CreateReminder] ❌ WARNING: DeviceActivityMonitor extension is NOT running!');
+                console.error('[CreateReminder] The extension has never initialized or cannot access App Group');
+                console.error('[CreateReminder] Reminders will NOT trigger when apps are opened');
+                console.error('[CreateReminder] Please rebuild the app in Xcode and ensure the extension target is included');
+              } else {
+                console.log('[CreateReminder] ✅ Extension is alive and communicating via App Group');
+                if (extensionStatus.lastIntervalStart && extensionStatus.lastIntervalStart > 0) {
+                  const lastStart = new Date(extensionStatus.lastIntervalStart * 1000);
+                  console.log(`[CreateReminder] Last interval started: ${lastStart.toISOString()}`);
+                }
+              }
+
+              console.log('[CreateReminder] When you open the selected app, DeviceActivity will write to App Group');
+              console.log('[CreateReminder] useNativeEvents will poll and detect the event');
             } else {
-              console.warn(`[CreateReminder] ⚠️ Failed to start monitoring for: ${config.activityName}`);
+              console.error(`[CreateReminder] ❌ FAILED to start monitoring!`);
+              console.error(`[CreateReminder] This reminder will NOT trigger when apps are opened`);
             }
+          } else {
+            console.error('[CreateReminder] ❌ ERROR: No activityName in trigger config!');
           }
+        } else {
+          console.error('[CreateReminder] ❌ ERROR: APP_OPENED trigger has no config!');
         }
+        console.log('=================================================');
       }
 
       // Dismiss modal and navigate back to list page with toast

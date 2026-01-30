@@ -147,6 +147,8 @@ export interface ChargingEvent extends SystemEvent {
   type: SystemEventType.CHARGING_STATE_CHANGED;
   data: {
     isCharging: boolean;
+    level?: number;
+    state?: string;
   };
 }
 

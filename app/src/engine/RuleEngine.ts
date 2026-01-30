@@ -149,15 +149,38 @@ export function doesTriggerMatchEvent(
   event: SystemEvent
 ): boolean {
   return reminder.triggers.some((trigger) => {
+    // Log trigger activation time details for debugging
+    console.log(`[RuleEngine] 🕐 Checking trigger activation time for reminder: "${reminder.title}"`);
+    console.log(`[RuleEngine] 🕐 Trigger type: ${trigger.type}`);
+    console.log(`[RuleEngine] 🕐 trigger.activationDateTime value: ${trigger.activationDateTime}`);
+    console.log(`[RuleEngine] 🕐 trigger.activationDateTime (readable): ${trigger.activationDateTime ? new Date(trigger.activationDateTime).toLocaleString() : 'NOT SET'}`);
+    console.log(`[RuleEngine] 🕐 event.timestamp value: ${event.timestamp}`);
+    console.log(`[RuleEngine] 🕐 event.timestamp (readable): ${new Date(event.timestamp).toLocaleString()}`);
+
     // Check if trigger has an activation time and if it's not yet active
     if (trigger.activationDateTime && event.timestamp < trigger.activationDateTime) {
-      console.log(`[RuleEngine] Trigger not yet active. Activation time: ${new Date(trigger.activationDateTime).toLocaleString()}, Current time: ${new Date(event.timestamp).toLocaleString()}`);
+      console.log(`[RuleEngine] ⏸️ Trigger not yet active. Activation time: ${new Date(trigger.activationDateTime).toLocaleString()}, Current time: ${new Date(event.timestamp).toLocaleString()}`);
       return false;
     }
 
+    console.log(`[RuleEngine] ✅ Trigger is active (no activation time set OR activation time has passed)`);
+
     switch (event.type) {
-      case SystemEventType.APP_BECAME_ACTIVE:
-        return trigger.type === TriggerType.PHONE_UNLOCK;
+      case SystemEventType.APP_BECAME_ACTIVE: {
+        console.log('[RuleEngine] 🔔 Evaluating APP_BECAME_ACTIVE (Phone Unlock) event');
+        console.log('[RuleEngine]   Event timestamp:', new Date(event.timestamp).toISOString());
+        console.log('[RuleEngine]   Trigger type:', trigger.type);
+        console.log('[RuleEngine]   Expected type:', TriggerType.PHONE_UNLOCK);
+
+        const matches = trigger.type === TriggerType.PHONE_UNLOCK;
+        console.log(`[RuleEngine]   Match result: ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
+
+        if (matches) {
+          console.log(`[RuleEngine] ✅ PHONE_UNLOCK trigger matched for reminder: ${reminder.id}`);
+        }
+
+        return matches;
+      }
 
       case SystemEventType.CHARGING_STATE_CHANGED: {
         const chargingEvent = event as ChargingEvent;
@@ -172,25 +195,41 @@ export function doesTriggerMatchEvent(
 
       case SystemEventType.APP_OPENED: {
         const appEvent = event as AppOpenedEvent;
+        console.log('[RuleEngine] 📱 Evaluating APP_OPENED event');
+        console.log('[RuleEngine]   Event bundleId (activityName):', appEvent.data.bundleId);
+        console.log('[RuleEngine]   Event timestamp:', new Date(appEvent.timestamp).toISOString());
+
         if (trigger.type !== TriggerType.APP_OPENED) {
+          console.log('[RuleEngine]   ❌ Trigger type mismatch:', trigger.type);
           return false;
         }
+
         // Match by activity name - each reminder has a unique activity name
         const config = trigger.config as { activityName?: string; bundleId?: string };
+        console.log('[RuleEngine]   Trigger config:', JSON.stringify(config));
 
         // New approach: match by activityName
-        if (config?.activityName && appEvent.data.bundleId === config.activityName) {
-          console.log(`[RuleEngine] APP_OPENED trigger matched by activity name: ${config.activityName}`);
-          return true;
+        if (config?.activityName) {
+          const matches = appEvent.data.bundleId === config.activityName;
+          console.log(`[RuleEngine]   Comparing: "${appEvent.data.bundleId}" === "${config.activityName}"`);
+          console.log(`[RuleEngine]   Match result: ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
+
+          if (matches) {
+            console.log(`[RuleEngine] ✅ APP_OPENED trigger matched by activity name: ${config.activityName}`);
+            return true;
+          }
+        } else {
+          console.log('[RuleEngine]   ⚠️ No activityName in trigger config');
         }
 
         // Legacy fallback: wildcard matching for old reminders
         const isWildcard = config?.bundleId === 'screentime.apps.selected';
         if (isWildcard) {
-          console.log(`[RuleEngine] APP_OPENED trigger matched (legacy wildcard)`);
+          console.log(`[RuleEngine] ✅ APP_OPENED trigger matched (legacy wildcard)`);
           return true;
         }
 
+        console.log('[RuleEngine]   ❌ No match found for this trigger');
         return false;
       }
 
@@ -275,7 +314,21 @@ export function evaluateRules(
   console.log('[RuleEngine] Reminders by status:', {
     waiting: allReminders.filter(r => r.status === ReminderStatus.WAITING).length,
     fired: allReminders.filter(r => r.status === ReminderStatus.FIRED).length,
+    expired: allReminders.filter(r => r.status === ReminderStatus.EXPIRED).length,
   });
+
+  // For APP_OPENED events, show which reminders have APP_OPENED triggers
+  if (event.type === SystemEventType.APP_OPENED) {
+    const appOpenedReminders = allReminders.filter(r =>
+      r.triggers.some(t => t.type === TriggerType.APP_OPENED)
+    );
+    console.log('[RuleEngine] 📱 Reminders with APP_OPENED triggers:', appOpenedReminders.length);
+    appOpenedReminders.forEach(r => {
+      const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
+      const config = appTrigger?.config as { activityName?: string } | undefined;
+      console.log(`[RuleEngine]   - "${r.title}" (status: ${r.status}, activityName: ${config?.activityName || 'NOT SET'})`);
+    });
+  }
 
   // Step 1: Filter reminders listening to this event
   const listeningReminders = getRemindersListeningTo(allReminders, event);
@@ -285,6 +338,8 @@ export function evaluateRules(
     listeningReminders.forEach(r => {
       console.log(`[RuleEngine] - "${r.title}" (${r.triggers.length} triggers, ${r.conditions.length} conditions)`);
     });
+  } else {
+    console.log('[RuleEngine] ⚠️ No reminders are listening to this event!');
   }
 
   // Step 2: Build evaluation context

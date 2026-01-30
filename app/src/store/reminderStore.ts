@@ -9,7 +9,10 @@ import {
   ReminderStatus,
   PaymentEntitlement,
   SystemEvent,
+  SystemEventType,
   SavedPlace,
+  TriggerType,
+  AppOpenedEvent,
   createReminder,
   markReminderAsFired,
   isReminderActive,
@@ -389,9 +392,91 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
   handleEvent: async (event: SystemEvent) => {
     const { reminders, systemState } = get();
 
-    console.log('[Store] handleEvent called');
-    console.log('[Store] Event:', event.type);
-    console.log('[Store] Reminders in store:', reminders.length);
+    console.log('=================================================');
+    console.log('[Store] 📥 handleEvent called');
+    console.log('[Store] Event type:', event.type);
+    console.log('[Store] Event timestamp:', new Date(event.timestamp).toISOString());
+    console.log('[Store] Total reminders in store:', reminders.length);
+    console.log('[Store] Reminders by status:', {
+      waiting: reminders.filter(r => r.status === ReminderStatus.WAITING).length,
+      fired: reminders.filter(r => r.status === ReminderStatus.FIRED).length,
+      expired: reminders.filter(r => r.status === ReminderStatus.EXPIRED).length,
+    });
+
+    // For APP_BECAME_ACTIVE (Phone Unlock) events, show extra details
+    if (event.type === SystemEventType.APP_BECAME_ACTIVE) {
+      console.log('[Store] 🔔 APP_BECAME_ACTIVE (Phone Unlock) event details:');
+
+      // Show which reminders have PHONE_UNLOCK triggers
+      const phoneUnlockReminders = reminders.filter(r =>
+        r.triggers.some(t => t.type === TriggerType.PHONE_UNLOCK)
+      );
+      console.log('[Store]   Reminders with PHONE_UNLOCK triggers:', phoneUnlockReminders.length);
+      phoneUnlockReminders.forEach(r => {
+        console.log(`[Store]     - "${r.title}" (id: ${r.id}, status: ${r.status})`);
+
+        // Check activation time for each trigger
+        const phoneUnlockTrigger = r.triggers.find(t => t.type === TriggerType.PHONE_UNLOCK);
+        if (phoneUnlockTrigger?.activationDateTime) {
+          const now = Date.now();
+          const activationTime = phoneUnlockTrigger.activationDateTime;
+          const isActive = now >= activationTime;
+          console.log(`[Store]       Activation time: ${new Date(activationTime).toLocaleString()}`);
+          console.log(`[Store]       Current time: ${new Date(now).toLocaleString()}`);
+          console.log(`[Store]       Is active: ${isActive ? '✅ YES' : '❌ NOT YET (will not fire)'}`);
+        }
+      });
+    }
+
+    // For APP_OPENED events, show extra details
+    if (event.type === SystemEventType.APP_OPENED) {
+      const appEvent = event as AppOpenedEvent;
+      console.log('[Store] APP_OPENED event details:');
+      console.log('[Store]   bundleId (activityName):', appEvent.data.bundleId);
+
+      // Show which reminders have APP_OPENED triggers
+      const appOpenedReminders = reminders.filter(r =>
+        r.triggers.some(t => t.type === TriggerType.APP_OPENED)
+      );
+      console.log('[Store]   Reminders with APP_OPENED triggers:', appOpenedReminders.length);
+      appOpenedReminders.forEach(r => {
+        const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
+        const config = appTrigger?.config as { activityName?: string } | undefined;
+        console.log(`[Store]     - "${r.title}" (status: ${r.status}, activityName: ${config?.activityName || 'NOT SET'})`);
+      });
+    }
+
+    // For CHARGING_STATE_CHANGED events, show extra details
+    if (event.type === SystemEventType.CHARGING_STATE_CHANGED) {
+      const chargingEvent = event as any;
+      console.log('[Store] 🔋 CHARGING_STATE_CHANGED event details:');
+      console.log('[Store]   Is charging:', chargingEvent.data.isCharging);
+      console.log('[Store]   Battery level:', chargingEvent.data.level);
+      console.log('[Store]   State:', chargingEvent.data.state);
+
+      // Show which reminders have CHARGING triggers
+      const chargingReminders = reminders.filter(r =>
+        r.triggers.some(t => t.type === TriggerType.CHARGING_STARTED)
+      );
+      console.log('[Store]   Reminders with CHARGING_STARTED triggers:', chargingReminders.length);
+      chargingReminders.forEach(r => {
+        console.log(`[Store]     - "${r.title}" (id: ${r.id}, status: ${r.status})`);
+
+        // Check activation time for each trigger
+        const chargingTrigger = r.triggers.find(t => t.type === TriggerType.CHARGING_STARTED);
+        if (chargingTrigger?.activationDateTime) {
+          const now = Date.now();
+          const activationTime = chargingTrigger.activationDateTime;
+          const isActive = now >= activationTime;
+          console.log(`[Store]       Activation time: ${new Date(activationTime).toLocaleString()}`);
+          console.log(`[Store]       Current time: ${new Date(now).toLocaleString()}`);
+          console.log(`[Store]       Is active: ${isActive ? '✅ YES' : '❌ NOT YET (will not fire)'}`);
+        } else {
+          console.log(`[Store]       No activation time set - will fire immediately`);
+        }
+      });
+    }
+    console.log('=================================================');
 
     // Fire notification handler
     const fireNotification = async (reminder: Reminder) => {
@@ -400,7 +485,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       );
 
       try {
-        console.log(`[Store] Calling notification service for: ${reminder.title}`);
+        console.log(`[Store] 🔔 Calling notification service for: ${reminder.title}`);
         await fireNotificationService(reminder);
         console.log(`[Store] ✅ Notification fired successfully for: ${reminder.title}`);
       } catch (error) {
@@ -411,12 +496,14 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
     // State update handler
     const updateReminderState = async (reminder: Reminder) => {
-      console.log(`[Store] Updating reminder state for: ${reminder.title}`);
+      console.log(`[Store] 💾 Updating reminder state for: ${reminder.title}`);
+      console.log(`[Store]   Old status: ${reminder.status}`);
       await get().updateReminder(reminder.id, reminder);
       console.log(`[Store] ✅ Reminder state updated`);
     };
 
     // Execute rule engine
+    console.log('[Store] 🚀 Calling rule engine (handleSystemEvent)...');
     await handleSystemEvent(
       event,
       reminders,
@@ -424,6 +511,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       fireNotification,
       updateReminderState
     );
+    console.log('[Store] ✅ Rule engine execution complete');
   },
 
   /**
@@ -645,6 +733,17 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       });
 
       console.log(`[Store] Loaded ${reminders.length} reminders and ${savedPlaces.length} saved places from storage`);
+
+      // Log activation time for each loaded reminder to verify database persistence
+      reminders.forEach(reminder => {
+        console.log(`[Store] 📋 Loaded reminder: "${reminder.title}"`);
+        reminder.triggers.forEach((trigger, index) => {
+          console.log(`[Store]   Trigger ${index + 1}:`);
+          console.log(`[Store]     type: ${trigger.type}`);
+          console.log(`[Store]     activationDateTime (raw): ${trigger.activationDateTime}`);
+          console.log(`[Store]     activationDateTime (readable): ${trigger.activationDateTime ? new Date(trigger.activationDateTime).toLocaleString() : 'NOT SET'}`);
+        });
+      });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load data',

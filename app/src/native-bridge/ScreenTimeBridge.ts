@@ -112,24 +112,33 @@ export function subscribeToPermissionChanges(
  * @returns Object with count of selected apps
  */
 export async function presentAppPicker(): Promise<AppSelectionResult> {
+  console.log('[ScreenTimeBridge] presentAppPicker called');
+
   if (!ScreenTimeModule) {
+    console.error('[ScreenTimeBridge] ScreenTimeModule is null/undefined!');
     throw new Error('ScreenTimeModule not available. Please build the app using Xcode to enable Screen Time features.');
   }
 
+  console.log('[ScreenTimeBridge] ScreenTimeModule exists, checking presentAppPicker method...');
+  console.log('[ScreenTimeBridge] presentAppPicker type:', typeof ScreenTimeModule.presentAppPicker);
+
   try {
+    console.log('[ScreenTimeBridge] Calling ScreenTimeModule.presentAppPicker()...');
     const result = await ScreenTimeModule.presentAppPicker();
     console.log('[ScreenTimeBridge] App selection result:', result);
     return result;
   } catch (error: any) {
     console.error('[ScreenTimeBridge] Failed to present app picker:', error);
-    
+    console.error('[ScreenTimeBridge] Error code:', error.code);
+    console.error('[ScreenTimeBridge] Error message:', error.message);
+
     // Handle user cancellation gracefully
     if (error.code === 'USER_CANCELLED' || error.message?.includes('cancelled')) {
       const cancelledError: any = new Error('User cancelled app selection');
       cancelledError.code = 'USER_CANCELLED';
       throw cancelledError;
     }
-    
+
     throw error;
   }
 }
@@ -209,6 +218,31 @@ export async function stopMonitoring(): Promise<boolean> {
 }
 
 /**
+ * Check if DeviceActivityMonitor extension is alive and working
+ */
+export async function checkExtensionStatus(): Promise<{
+  alive: boolean;
+  extensionAlive?: number;
+  lastIntervalStart?: number;
+  appGroupId?: string;
+  activeActivities?: string[];
+  error?: string;
+}> {
+  if (!ScreenTimeModule) {
+    return { alive: false, error: 'ScreenTimeModule not available' };
+  }
+
+  try {
+    const status = await ScreenTimeModule.checkExtensionStatus();
+    console.log('[ScreenTimeBridge] Extension status:', status);
+    return status;
+  } catch (error) {
+    console.error('[ScreenTimeBridge] Failed to check extension status:', error);
+    return { alive: false, error: String(error) };
+  }
+}
+
+/**
  * Check for new app opened events from the DeviceActivity extension
  * Returns null if no new events
  */
@@ -219,18 +253,32 @@ export async function checkForAppOpenedEvents(): Promise<{
   type: string;
 } | null> {
   if (!ScreenTimeModule) {
+    console.warn('[ScreenTimeBridge] ⚠️ Module not available for checking events');
     return null;
   }
 
   try {
     const event = await ScreenTimeModule.checkForAppOpenedEvents();
     if (event && typeof event === 'object') {
-      console.log('[ScreenTimeBridge] App opened event detected:', event);
+      console.log('[ScreenTimeBridge] ✅ App opened event detected from App Group!');
+      console.log('[ScreenTimeBridge] Event details:', JSON.stringify(event, null, 2));
+
+      // Validate event structure
+      if (!event.activityName) {
+        console.error('[ScreenTimeBridge] ❌ Event missing activityName field!');
+      }
+      if (!event.timestamp) {
+        console.error('[ScreenTimeBridge] ❌ Event missing timestamp field!');
+      }
+
       return event as any;
     }
     return null;
-  } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to check for events:', error);
+  } catch (error: any) {
+    console.error('[ScreenTimeBridge] ❌ Failed to check for events:', error);
+    console.error('[ScreenTimeBridge] Error type:', error?.constructor?.name);
+    console.error('[ScreenTimeBridge] Error message:', error?.message);
+    console.error('[ScreenTimeBridge] This may indicate App Group communication failure');
     return null;
   }
 }

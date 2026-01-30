@@ -36,16 +36,23 @@ export function subscribeToChargingStateChanges(
     'CHARGING_STATE_CHANGED',
     (nativeEvent: {
       timestamp: number;
-      type: string;
-      data: { isCharging: boolean; batteryLevel: number; state: string };
+      state: string;
+      level: number;
+      isCharging: boolean;
     }) => {
+      console.log('[BatteryBridge] 🔋 Received native event:', nativeEvent);
+
       const event: ChargingEvent = {
         type: SystemEventType.CHARGING_STATE_CHANGED,
-        timestamp: nativeEvent.timestamp,
+        timestamp: nativeEvent.timestamp * 1000, // Convert to milliseconds
         data: {
-          isCharging: nativeEvent.data.isCharging,
+          isCharging: nativeEvent.isCharging,
+          level: nativeEvent.level,
+          state: nativeEvent.state,
         },
       };
+
+      console.log('[BatteryBridge] 🔋 Dispatching event:', event);
       callback(event);
     }
   );
@@ -82,7 +89,7 @@ export async function enableBatteryMonitoring(): Promise<void> {
   }
 
   try {
-    await BatteryModule.enableBatteryMonitoring();
+    await BatteryModule.enableBatteryMonitoring(true);
   } catch (error) {
     console.error('[BatteryBridge] Failed to enable battery monitoring:', error);
     throw error;
@@ -98,7 +105,7 @@ export async function disableBatteryMonitoring(): Promise<void> {
   }
 
   try {
-    await BatteryModule.disableBatteryMonitoring();
+    await BatteryModule.enableBatteryMonitoring(false);
   } catch (error) {
     console.error('[BatteryBridge] Failed to disable battery monitoring:', error);
     throw error;

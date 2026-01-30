@@ -13,7 +13,7 @@ import {
 } from '../native-bridge/BatteryBridge';
 import { subscribeToRegionEntered } from '../native-bridge/LocationBridge';
 import { checkForAppOpenedEvents } from '../native-bridge/ScreenTimeBridge';
-import { SystemEventType, ReminderStatus } from '../domain';
+import { SystemEventType, ReminderStatus, TriggerType, LocationConfig } from '../domain';
 
 export function useNativeEvents() {
   const handleEvent = useReminderStore((state) => state.handleEvent);
@@ -35,7 +35,6 @@ export function useNativeEvents() {
   useEffect(() => {
     const registerStoredGeofences = async () => {
       const { registerGeofence } = await import('../native-bridge/LocationBridge');
-      const { TriggerType, LocationConfig } = await import('../domain');
 
       // Wait for reminders to load
       if (reminders.length === 0) return;
@@ -129,6 +128,12 @@ export function useNativeEvents() {
     // Poll for app opened events from DeviceActivity extension
     // The extension writes events to App Group storage, which we need to check periodically
     console.log('[useNativeEvents] Setting up APP_OPENED polling interval...');
+    console.log('[useNativeEvents] ℹ️ NOTE: DeviceActivity extension logs appear in system Console.app, not Metro');
+    console.log('[useNativeEvents] ℹ️ To view extension logs:');
+    console.log('[useNativeEvents] ℹ️   1. Open Console.app on Mac');
+    console.log('[useNativeEvents] ℹ️   2. Filter by "DeviceActivityMonitor"');
+    console.log('[useNativeEvents] ℹ️   3. Watch for 🔥 EVENT THRESHOLD REACHED messages');
+
     let pollCount = 0;
     const pollInterval = setInterval(async () => {
       pollCount++;
@@ -136,11 +141,36 @@ export function useNativeEvents() {
 
       try {
         const rawEvent = await checkForAppOpenedEvents();
-        console.log('[useNativeEvents] Poll result:', rawEvent ? 'EVENT FOUND' : 'no event');
+        console.log('[useNativeEvents] Poll result:', rawEvent ? 'EVENT FOUND ✅' : 'no event');
+
+        // Log App Group status every 10 polls (30 seconds)
+        if (pollCount % 10 === 0) {
+          console.log('[useNativeEvents] ℹ️ App Group status check:');
+          console.log(`[useNativeEvents]   - Polls completed: ${pollCount}`);
+          console.log(`[useNativeEvents]   - Events found: ${pollCount - (pollCount - (lastProcessedEventRef.current ? 1 : 0))}`);
+          console.log('[useNativeEvents]   - App Group ID: group.com.ibnuj.until');
+          console.log('[useNativeEvents]   - If no events after app usage, check Console.app for extension logs');
+        }
 
         if (rawEvent) {
+          console.log('=================================================');
+          console.log('[useNativeEvents] 📱 RAW APP_OPENED EVENT DETECTED');
+          console.log('[useNativeEvents] Raw event data:', JSON.stringify(rawEvent, null, 2));
+          console.log('[useNativeEvents] Event timestamp:', new Date(rawEvent.timestamp).toISOString());
+          console.log('[useNativeEvents] Event name (from DeviceActivity):', rawEvent.eventName);
+          console.log('[useNativeEvents] Activity name (reminder ID):', rawEvent.activityName);
+          console.log('=================================================');
+
+          // Validate event has required fields
+          if (!rawEvent.activityName) {
+            console.error('[useNativeEvents] ❌ ERROR: Event missing activityName!');
+            console.error('[useNativeEvents] This event cannot be matched to a reminder');
+            return;
+          }
+
           // Create a unique identifier for this event to prevent duplicate processing
-          const eventId = `${rawEvent.timestamp}-${rawEvent.eventName}`;
+          // Use activityName instead of eventName for better uniqueness
+          const eventId = `${rawEvent.activityName}-${rawEvent.timestamp}`;
 
           // Skip if we've already processed this event
           if (lastProcessedEventRef.current === eventId) {
@@ -150,13 +180,34 @@ export function useNativeEvents() {
 
           lastProcessedEventRef.current = eventId;
 
-          console.log('=================================================');
-          console.log('[useNativeEvents] 📱 APP_OPENED event detected from polling!');
-          console.log('[useNativeEvents] Event timestamp:', new Date(rawEvent.timestamp).toISOString());
-          console.log('[useNativeEvents] Event name:', rawEvent.eventName);
-          console.log('[useNativeEvents] Activity name:', rawEvent.activityName);
-          console.log('[useNativeEvents] Active reminders:', reminders.filter(r => r.status === ReminderStatus.WAITING).length);
-          console.log('=================================================');
+          // Validate activityName format (should be "reminder_<uuid>")
+          if (!rawEvent.activityName.startsWith('reminder_')) {
+            console.warn('[useNativeEvents] ⚠️ WARNING: Unexpected activityName format:', rawEvent.activityName);
+            console.warn('[useNativeEvents] Expected format: reminder_<uuid>');
+          }
+
+          // Check if any waiting reminders have this activityName
+          const matchingReminders = reminders.filter(r => {
+            if (r.status !== ReminderStatus.WAITING) return false;
+            const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
+            if (!appTrigger) return false;
+            const config = appTrigger.config as { activityName?: string } | undefined;
+            return config?.activityName === rawEvent.activityName;
+          });
+
+          console.log('[useNativeEvents] 🔍 Validation:');
+          console.log('[useNativeEvents]   Total reminders:', reminders.length);
+          console.log('[useNativeEvents]   Waiting reminders:', reminders.filter(r => r.status === ReminderStatus.WAITING).length);
+          console.log('[useNativeEvents]   Matching reminders for activityName:', matchingReminders.length);
+
+          if (matchingReminders.length > 0) {
+            matchingReminders.forEach(r => {
+              console.log(`[useNativeEvents]   ✅ Found matching reminder: "${r.title}" (id: ${r.id})`);
+            });
+          } else {
+            console.warn('[useNativeEvents]   ⚠️ WARNING: No waiting reminders match this activityName!');
+            console.warn('[useNativeEvents]   This event will likely not trigger any reminders');
+          }
 
           // Convert raw event to AppOpenedEvent format
           // The activityName contains the unique reminder identifier (e.g., "reminder_abc123")
@@ -168,8 +219,11 @@ export function useNativeEvents() {
             },
           };
 
+          console.log('[useNativeEvents] 📤 Dispatching event to handleEvent with bundleId:', appOpenedEvent.data.bundleId);
+          console.log('=================================================');
+
           handleEvent(appOpenedEvent).catch((error) => {
-            console.error('[useNativeEvents] Error handling app opened event:', error);
+            console.error('[useNativeEvents] ❌ Error handling app opened event:', error);
           });
         }
       } catch (error) {
