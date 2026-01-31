@@ -50,6 +50,8 @@ export default function CreateReminderScreen() {
     categoryCount: number;
     webDomainCount: number;
   }>({ appCount: 0, categoryCount: 0, webDomainCount: 0 });
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [selectedAppName, setSelectedAppName] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<LocationConfig | null>(null);
   const [showSavedPlacesList, setShowSavedPlacesList] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
@@ -128,19 +130,20 @@ export default function CreateReminderScreen() {
         // First time selecting - show app picker
         await handleAppTriggerSelection();
       } else {
-        // Already selected - allow user to change apps or deselect
+        // Already selected - allow user to change app or deselect
         Alert.alert(
           'App Trigger Selected',
-          `You have ${selectedAppCount} ${selectedAppCount === 1 ? 'app' : 'apps'} selected. What would you like to do?`,
+          `App selected: ${selectedAppName || selectedAppId}\n\nWhat would you like to do?`,
           [
             { text: 'Cancel', style: 'cancel' },
             {
-              text: 'Change Apps',
+              text: 'Change App',
               onPress: async () => {
                 // Clear current selection and show picker again
                 await screenTime.clearApps();
-                // Don't call handleAppTriggerSelection as it adds the trigger again
-                // Just show the picker directly
+                setSelectedAppId(null);
+                setSelectedAppName(null);
+                // Show the picker directly
                 await showAppPickerFlow();
               }
             },
@@ -149,8 +152,9 @@ export default function CreateReminderScreen() {
               style: 'destructive',
               onPress: async () => {
                 setSelectedTriggers((prev) => prev.filter((t) => t !== triggerType));
+                setSelectedAppId(null);
+                setSelectedAppName(null);
                 setSelectedAppCount(0);
-                setSelectedAppDetails({ appCount: 0, categoryCount: 0, webDomainCount: 0 });
                 await screenTime.clearApps();
               }
             }
@@ -264,23 +268,43 @@ export default function CreateReminderScreen() {
   };
 
   const showAppPickerFlow = async () => {
-    console.log('[CreateReminder] showAppPickerFlow called');
+    console.log('[CreateReminder] showAppPickerFlow called (Global App Library mode)');
     try {
       console.log('[CreateReminder] Calling screenTime.showAppPicker()...');
       const result = await screenTime.showAppPicker();
       console.log('[CreateReminder] App picker result:', result);
 
       if (result && result.selectedCount > 0) {
-        console.log('[CreateReminder] User selected', result.selectedCount, 'items');
-        // User selected apps successfully
-        setSelectedAppCount(result.selectedCount);
-        setSelectedAppDetails({
-          appCount: result.appCount || 0,
-          categoryCount: result.categoryCount || 0,
-          webDomainCount: result.webDomainCount || 0,
-        });
+        console.log('[CreateReminder] User selected', result.selectedCount, 'app(s)');
 
-        // Only add trigger if not already present (prevents duplicates when changing apps)
+        // IMPORTANT: With global library, user should select ONE app per reminder
+        // Generate unique ID for this app
+        const timestamp = Date.now();
+        const appIds = Array.from({ length: result.selectedCount }, (_, i) =>
+          `app_${timestamp}_${i}`
+        );
+
+        console.log('[CreateReminder] Adding apps to global library with IDs:', appIds);
+
+        // Add apps to global library
+        const { addAppsToLibrary } = await import('@/app/src/native-bridge/ScreenTimeBridge');
+        const success = await addAppsToLibrary(appIds);
+
+        if (!success) {
+          throw new Error('Failed to add apps to global library');
+        }
+
+        console.log('[CreateReminder] ✅ Apps added to global library successfully');
+
+        // For now, use the first app (in production UI, we'd let user pick ONE app)
+        const selectedId = appIds[0];
+
+        // Store the selected app for this reminder
+        setSelectedAppId(selectedId);
+        setSelectedAppName(`App ${timestamp}`); // In production, get real app name
+        setSelectedAppCount(1); // Only one app per reminder with new architecture
+
+        // Only add trigger if not already present
         setSelectedTriggers((prev) => {
           if (!prev.includes(TriggerType.APP_OPENED)) {
             return [...prev, TriggerType.APP_OPENED];
@@ -288,28 +312,12 @@ export default function CreateReminderScreen() {
           return prev;
         });
 
-        // Build description based on selection
-        let description = '';
-        if (result.appCount && result.appCount > 0) {
-          description += `${result.appCount} ${result.appCount === 1 ? 'app' : 'apps'}`;
-        }
-        if (result.categoryCount && result.categoryCount > 0) {
-          if (description) description += ', ';
-          description += `${result.categoryCount} ${result.categoryCount === 1 ? 'category' : 'categories'}`;
-        }
-        if (result.webDomainCount && result.webDomainCount > 0) {
-          if (description) description += ', ';
-          description += `${result.webDomainCount} ${result.webDomainCount === 1 ? 'website' : 'websites'}`;
-        }
+        console.log('[CreateReminder] App selected with ID:', selectedId);
 
-        // NOTE: Monitoring will start when the reminder is created
-        // This allows us to use the reminder ID as the unique activity name
-        console.log('[CreateReminder] Apps selected, will start monitoring when reminder is created');
-
-        // Show success message with detailed count
+        // Show success message
         Alert.alert(
-          '✓ Apps Selected',
-          `Selected: ${description}\n\nMonitoring will start when you create the reminder.`,
+          '✓ App Selected',
+          `App added to library with ID: ${selectedId}\n\nThis reminder will fire ONLY when this specific app is opened.`,
           [{ text: 'OK' }]
         );
       } else if (result === null) {
@@ -318,7 +326,7 @@ export default function CreateReminderScreen() {
       }
     } catch (error: any) {
       console.error('[CreateReminder] Failed to show app picker:', error);
-      
+
       // Check if it's a module not available error
       if (error.message?.includes('not available') || screenTime.error) {
         Alert.alert(
@@ -542,8 +550,8 @@ export default function CreateReminderScreen() {
     }
 
     // Validate app selection if APP_OPENED trigger is selected
-    if (selectedTriggers.includes(TriggerType.APP_OPENED) && selectedAppCount === 0) {
-      Alert.alert('Error', 'Please select apps to monitor for the app trigger');
+    if (selectedTriggers.includes(TriggerType.APP_OPENED) && !selectedAppId) {
+      Alert.alert('Error', 'Please select an app to monitor for the app trigger');
       return;
     }
 
@@ -573,16 +581,15 @@ export default function CreateReminderScreen() {
       const reminder = createReminder(title.trim(), [], [], description.trim());
 
       // Create triggers with config for APP_OPENED, LOCATION_ENTER, and SCHEDULED_TIME
-      // For APP_OPENED, we use the reminder ID as the unique activity name
+      // For APP_OPENED, we use the global app ID for precise matching
       const triggers = selectedTriggers.map((type) => {
         if (type === TriggerType.APP_OPENED) {
-          // Use reminder ID as unique activity name for monitoring
-          const activityName = `reminder_${reminder.id}`;
+          // Use global app ID for precise matching
           return createTrigger(
             type,
             {
-              activityName,
-              appName: `${selectedAppCount} selected app${selectedAppCount > 1 ? 's' : ''}`,
+              appId: selectedAppId!,
+              displayName: selectedAppName || 'Selected App',
             },
             activationDateTime
           );
@@ -625,30 +632,44 @@ export default function CreateReminderScreen() {
       // Save to store (which persists to database)
       await addReminder(reminder);
 
-      // Start monitoring for APP_OPENED triggers with unique activity name
+      // Start global app monitoring if APP_OPENED triggers exist
       if (selectedTriggers.includes(TriggerType.APP_OPENED)) {
         console.log('=================================================');
-        console.log('[CreateReminder] 📱 Setting up APP_OPENED monitoring');
+        console.log('[CreateReminder] 📱 Setting up Global App Monitoring');
         console.log('[CreateReminder] Reminder ID:', reminder.id);
         console.log('[CreateReminder] Reminder title:', reminder.title);
-        console.log('[CreateReminder] Reminder status:', reminder.status);
+        console.log('[CreateReminder] App ID:', selectedAppId);
 
         const appTrigger = triggers.find(t => t.type === TriggerType.APP_OPENED);
         if (appTrigger && appTrigger.config) {
-          const config = appTrigger.config as { activityName?: string; appName?: string };
+          const config = appTrigger.config as { appId?: string; displayName?: string };
           console.log('[CreateReminder] Trigger config:', JSON.stringify(config));
 
-          if (config.activityName) {
-            console.log(`[CreateReminder] 🚀 Starting DeviceActivity monitoring...`);
-            console.log(`[CreateReminder] Activity name: ${config.activityName}`);
-            console.log(`[CreateReminder] Selected apps: ${config.appName || 'unknown'}`);
+          if (config.appId) {
+            console.log(`[CreateReminder] 🚀 Starting Global App Monitoring...`);
+            console.log(`[CreateReminder] App ID: ${config.appId}`);
+            console.log(`[CreateReminder] Display name: ${config.displayName}`);
 
-            const result = await screenTime.startMonitoring(config.activityName);
+            // Import global monitoring functions
+            const { startGlobalAppMonitoring, stopGlobalAppMonitoring, getGlobalAppCount } =
+              await import('@/app/src/native-bridge/ScreenTimeBridge');
 
-            console.log('[CreateReminder] Monitoring result:', result);
-            if (result.success) {
-              console.log(`[CreateReminder] ✅ Monitoring started successfully!`);
-              console.log(`[CreateReminder] Activity name: ${result.activityName || config.activityName}`);
+            // Stop existing global monitoring first
+            console.log('[CreateReminder] 🛑 Stopping existing global monitoring...');
+            await stopGlobalAppMonitoring();
+
+            // Check how many apps are in the library
+            const appCount = await getGlobalAppCount();
+            console.log(`[CreateReminder] Global library contains ${appCount} app(s)`);
+
+            // Start global monitoring for ALL apps in the library
+            console.log('[CreateReminder] 🔄 Starting global app monitoring for all library apps...');
+            const success = await startGlobalAppMonitoring();
+
+            if (success) {
+              console.log(`[CreateReminder] ✅ Global monitoring started successfully!`);
+              console.log(`[CreateReminder] Monitoring ${appCount} app(s) with ONE session`);
+              console.log(`[CreateReminder] This reminder will fire ONLY for app: ${config.appId}`);
 
               // Check extension status
               const { checkExtensionStatus } = await import('@/app/src/native-bridge/ScreenTimeBridge');
@@ -661,23 +682,18 @@ export default function CreateReminderScreen() {
                 console.error('[CreateReminder] ❌ WARNING: DeviceActivityMonitor extension is NOT running!');
                 console.error('[CreateReminder] The extension has never initialized or cannot access App Group');
                 console.error('[CreateReminder] Reminders will NOT trigger when apps are opened');
-                console.error('[CreateReminder] Please rebuild the app in Xcode and ensure the extension target is included');
               } else {
                 console.log('[CreateReminder] ✅ Extension is alive and communicating via App Group');
-                if (extensionStatus.lastIntervalStart && extensionStatus.lastIntervalStart > 0) {
-                  const lastStart = new Date(extensionStatus.lastIntervalStart * 1000);
-                  console.log(`[CreateReminder] Last interval started: ${lastStart.toISOString()}`);
-                }
               }
 
-              console.log('[CreateReminder] When you open the selected app, DeviceActivity will write to App Group');
-              console.log('[CreateReminder] useNativeEvents will poll and detect the event');
+              console.log('[CreateReminder] When you open the selected app, DeviceActivity will emit appId');
+              console.log('[CreateReminder] useNativeEvents will match the appId to fire ONLY this reminder');
             } else {
-              console.error(`[CreateReminder] ❌ FAILED to start monitoring!`);
+              console.error(`[CreateReminder] ❌ FAILED to start global monitoring!`);
               console.error(`[CreateReminder] This reminder will NOT trigger when apps are opened`);
             }
           } else {
-            console.error('[CreateReminder] ❌ ERROR: No activityName in trigger config!');
+            console.error('[CreateReminder] ❌ ERROR: No appId in trigger config!');
           }
         } else {
           console.error('[CreateReminder] ❌ ERROR: APP_OPENED trigger has no config!');
