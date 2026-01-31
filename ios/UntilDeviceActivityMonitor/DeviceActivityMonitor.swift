@@ -105,15 +105,19 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         print("[DeviceActivityMonitor] ✅ App Group accessed successfully")
 
         // Store the event with timestamp
+        // IMPORTANT: event.rawValue contains the app ID (e.g., "app_instagram")
+        // This allows precise app-to-reminder matching!
         let timestamp = Date().timeIntervalSince1970 * 1000
         let eventData: [String: Any] = [
-            "eventName": event.rawValue,
-            "activityName": activity.rawValue,
-            "timestamp": timestamp, // milliseconds
+            "appId": event.rawValue,           // NEW: Precise app identifier
+            "eventName": event.rawValue,        // Keep for backward compatibility
+            "activityName": activity.rawValue,  // Will be "global_app_monitor"
+            "timestamp": timestamp,             // milliseconds
             "type": "APP_OPENED"
         ]
 
         print("[DeviceActivityMonitor] 📦 Event data to write:")
+        print("[DeviceActivityMonitor] 📦   appId: \(event.rawValue) ✨ PRECISE APP ID!")
         print("[DeviceActivityMonitor] 📦   eventName: \(event.rawValue)")
         print("[DeviceActivityMonitor] 📦   activityName: \(activity.rawValue)")
         print("[DeviceActivityMonitor] 📦   timestamp: \(timestamp)")
