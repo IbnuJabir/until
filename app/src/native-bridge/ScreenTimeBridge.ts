@@ -248,6 +248,7 @@ export async function checkExtensionStatus(): Promise<{
  */
 export async function checkForAppOpenedEvents(): Promise<{
   timestamp: number;
+  appId: string;
   eventName: string;
   activityName: string;
   type: string;
@@ -264,8 +265,8 @@ export async function checkForAppOpenedEvents(): Promise<{
       console.log('[ScreenTimeBridge] Event details:', JSON.stringify(event, null, 2));
 
       // Validate event structure
-      if (!event.activityName) {
-        console.error('[ScreenTimeBridge] ❌ Event missing activityName field!');
+      if (!event.appId) {
+        console.error('[ScreenTimeBridge] ❌ Event missing appId field!');
       }
       if (!event.timestamp) {
         console.error('[ScreenTimeBridge] ❌ Event missing timestamp field!');
@@ -317,4 +318,108 @@ export function subscribeToAppOpened(
   );
 
   return () => subscription.remove();
+}
+
+// MARK: - Global App Library
+
+/**
+ * Add apps from FamilyActivityPicker to the global app library
+ * @param appIds Array of unique app IDs (e.g., ["app_instagram", "app_twitter"])
+ * @returns Success boolean
+ */
+export async function addAppsToLibrary(appIds: string[]): Promise<boolean> {
+  if (!ScreenTimeModule) {
+    console.error('[ScreenTimeBridge] Module not available');
+    return false;
+  }
+
+  try {
+    console.log('[ScreenTimeBridge] Adding apps to library:', appIds);
+    await ScreenTimeModule.addAppsToLibrary(appIds);
+    console.log('[ScreenTimeBridge] Apps added successfully');
+    return true;
+  } catch (error) {
+    console.error('[ScreenTimeBridge] Failed to add apps to library:', error);
+    return false;
+  }
+}
+
+/**
+ * Remove an app from the global library
+ */
+export async function removeAppFromLibrary(appId: string): Promise<boolean> {
+  if (!ScreenTimeModule) {
+    console.error('[ScreenTimeBridge] Module not available');
+    return false;
+  }
+
+  try {
+    console.log('[ScreenTimeBridge] Removing app from library:', appId);
+    await ScreenTimeModule.removeAppFromLibrary(appId);
+    console.log('[ScreenTimeBridge] App removed successfully');
+    return true;
+  } catch (error) {
+    console.error('[ScreenTimeBridge] Failed to remove app from library:', error);
+    return false;
+  }
+}
+
+/**
+ * Start global app monitoring
+ * Monitors ALL apps in the global library with one event per app
+ */
+export async function startGlobalAppMonitoring(): Promise<boolean> {
+  if (!ScreenTimeModule) {
+    console.error('[ScreenTimeBridge] Module not available');
+    return false;
+  }
+
+  try {
+    console.log('[ScreenTimeBridge] Starting global app monitoring...');
+    await ScreenTimeModule.startGlobalAppMonitoring();
+    console.log('[ScreenTimeBridge] Global app monitoring started');
+    return true;
+  } catch (error) {
+    console.error('[ScreenTimeBridge] Failed to start global app monitoring:', error);
+    return false;
+  }
+}
+
+/**
+ * Stop global app monitoring
+ */
+export async function stopGlobalAppMonitoring(): Promise<boolean> {
+  if (!ScreenTimeModule) {
+    console.error('[ScreenTimeBridge] Module not available');
+    return false;
+  }
+
+  try {
+    console.log('[ScreenTimeBridge] Stopping global app monitoring...');
+    await ScreenTimeModule.stopGlobalAppMonitoring();
+    console.log('[ScreenTimeBridge] Global app monitoring stopped');
+    return true;
+  } catch (error) {
+    console.error('[ScreenTimeBridge] Failed to stop global app monitoring:', error);
+    return false;
+  }
+}
+
+/**
+ * Get the count of apps in the global library
+ */
+export async function getGlobalAppCount(): Promise<number> {
+  if (!ScreenTimeModule) {
+    console.error('[ScreenTimeBridge] Module not available');
+    return 0;
+  }
+
+  try {
+    const count = await ScreenTimeModule.getGlobalAppCount();
+    console.log('[ScreenTimeBridge] Global app count:', count);
+    return count;
+  } catch (error) {
+    console.error('[ScreenTimeBridge] Failed to get global app count:', error);
+    return 0;
+  }
 }

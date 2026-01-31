@@ -11,6 +11,16 @@
 import * as SQLite from 'expo-sqlite';
 import { Condition, PaymentEntitlement, Reminder, SavedPlace, Trigger } from '../domain';
 
+/**
+ * Global App - represents an app in the user's monitoring library
+ */
+export interface GlobalApp {
+  id: string;          // Unique ID (e.g., "app_instagram")
+  displayName: string; // User-facing name (e.g., "Instagram")
+  addedAt: number;     // Unix timestamp when added
+  usageCount: number;  // How many reminders use this app
+}
+
 const DATABASE_NAME = 'until.db';
 
 /**
@@ -104,6 +114,16 @@ export async function initDatabase(): Promise<void> {
       address TEXT,
       created_at INTEGER NOT NULL,
       last_used_at INTEGER,
+      usage_count INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+
+  // Create global_apps table (for app library)
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS global_apps (
+      id TEXT PRIMARY KEY NOT NULL,
+      display_name TEXT NOT NULL,
+      added_at INTEGER NOT NULL,
       usage_count INTEGER NOT NULL DEFAULT 0
     );
   `);
@@ -573,4 +593,110 @@ export async function incrementPlaceUsage(id: string): Promise<void> {
   );
 
   console.log(`[Database] Incremented usage count for place: ${id}`);
+}
+
+// ============================================================================
+// GLOBAL APPS CRUD (App Library for Screen Time Monitoring)
+// ============================================================================
+
+/**
+ * Save a global app to the library
+ */
+export async function saveGlobalApp(app: GlobalApp): Promise<void> {
+  const db = openDatabase();
+
+  db.runSync(
+    `INSERT OR REPLACE INTO global_apps
+    (id, display_name, added_at, usage_count)
+    VALUES (?, ?, ?, ?)`,
+    [app.id, app.displayName, app.addedAt, app.usageCount]
+  );
+
+  console.log(`[Database] Saved global app: ${app.displayName}`);
+}
+
+/**
+ * Load all global apps from the library
+ */
+export async function loadAllGlobalApps(): Promise<GlobalApp[]> {
+  const db = openDatabase();
+
+  const rows = db.getAllSync<any>(
+    'SELECT * FROM global_apps ORDER BY added_at DESC;'
+  );
+
+  const apps: GlobalApp[] = rows.map((row) => ({
+    id: row.id,
+    displayName: row.display_name,
+    addedAt: row.added_at,
+    usageCount: row.usage_count,
+  }));
+
+  console.log(`[Database] Loaded ${apps.length} global apps`);
+  return apps;
+}
+
+/**
+ * Get a single global app by ID
+ */
+export async function getGlobalApp(id: string): Promise<GlobalApp | null> {
+  const db = openDatabase();
+
+  const row = db.getFirstSync<any>(
+    'SELECT * FROM global_apps WHERE id = ?',
+    [id]
+  );
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    addedAt: row.added_at,
+    usageCount: row.usage_count,
+  };
+}
+
+/**
+ * Update a global app's display name
+ */
+export async function updateGlobalAppName(
+  id: string,
+  displayName: string
+): Promise<void> {
+  const db = openDatabase();
+
+  db.runSync('UPDATE global_apps SET display_name = ? WHERE id = ?', [
+    displayName,
+    id,
+  ]);
+
+  console.log(`[Database] Updated global app name: ${id}`);
+}
+
+/**
+ * Delete a global app from the library
+ */
+export async function deleteGlobalApp(id: string): Promise<void> {
+  const db = openDatabase();
+
+  db.runSync('DELETE FROM global_apps WHERE id = ?', [id]);
+
+  console.log(`[Database] Deleted global app: ${id}`);
+}
+
+/**
+ * Increment usage count for a global app
+ */
+export async function incrementGlobalAppUsage(id: string): Promise<void> {
+  const db = openDatabase();
+
+  db.runSync(
+    'UPDATE global_apps SET usage_count = usage_count + 1 WHERE id = ?',
+    [id]
+  );
+
+  console.log(`[Database] Incremented usage count for global app: ${id}`);
 }

@@ -157,20 +157,19 @@ export function useNativeEvents() {
           console.log('[useNativeEvents] 📱 RAW APP_OPENED EVENT DETECTED');
           console.log('[useNativeEvents] Raw event data:', JSON.stringify(rawEvent, null, 2));
           console.log('[useNativeEvents] Event timestamp:', new Date(rawEvent.timestamp).toISOString());
-          console.log('[useNativeEvents] Event name (from DeviceActivity):', rawEvent.eventName);
-          console.log('[useNativeEvents] Activity name (reminder ID):', rawEvent.activityName);
+          console.log('[useNativeEvents] App ID (precise identifier):', rawEvent.appId);
+          console.log('[useNativeEvents] Activity name (global monitor):', rawEvent.activityName);
           console.log('=================================================');
 
           // Validate event has required fields
-          if (!rawEvent.activityName) {
-            console.error('[useNativeEvents] ❌ ERROR: Event missing activityName!');
-            console.error('[useNativeEvents] This event cannot be matched to a reminder');
+          if (!rawEvent.appId) {
+            console.error('[useNativeEvents] ❌ ERROR: Event missing appId!');
+            console.error('[useNativeEvents] This event cannot be matched to reminders');
             return;
           }
 
           // Create a unique identifier for this event to prevent duplicate processing
-          // Use activityName instead of eventName for better uniqueness
-          const eventId = `${rawEvent.activityName}-${rawEvent.timestamp}`;
+          const eventId = `${rawEvent.appId}-${rawEvent.timestamp}`;
 
           // Skip if we've already processed this event
           if (lastProcessedEventRef.current === eventId) {
@@ -180,46 +179,40 @@ export function useNativeEvents() {
 
           lastProcessedEventRef.current = eventId;
 
-          // Validate activityName format (should be "reminder_<uuid>")
-          if (!rawEvent.activityName.startsWith('reminder_')) {
-            console.warn('[useNativeEvents] ⚠️ WARNING: Unexpected activityName format:', rawEvent.activityName);
-            console.warn('[useNativeEvents] Expected format: reminder_<uuid>');
-          }
-
-          // Check if any waiting reminders have this activityName
+          // Check if any waiting reminders have this appId
           const matchingReminders = reminders.filter(r => {
             if (r.status !== ReminderStatus.WAITING) return false;
             const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
             if (!appTrigger) return false;
-            const config = appTrigger.config as { activityName?: string } | undefined;
-            return config?.activityName === rawEvent.activityName;
+            const config = appTrigger.config as { appId?: string } | undefined;
+            return config?.appId === rawEvent.appId;
           });
 
           console.log('[useNativeEvents] 🔍 Validation:');
           console.log('[useNativeEvents]   Total reminders:', reminders.length);
           console.log('[useNativeEvents]   Waiting reminders:', reminders.filter(r => r.status === ReminderStatus.WAITING).length);
-          console.log('[useNativeEvents]   Matching reminders for activityName:', matchingReminders.length);
+          console.log('[useNativeEvents]   Matching reminders for appId:', matchingReminders.length);
 
           if (matchingReminders.length > 0) {
             matchingReminders.forEach(r => {
               console.log(`[useNativeEvents]   ✅ Found matching reminder: "${r.title}" (id: ${r.id})`);
             });
           } else {
-            console.warn('[useNativeEvents]   ⚠️ WARNING: No waiting reminders match this activityName!');
-            console.warn('[useNativeEvents]   This event will likely not trigger any reminders');
+            console.warn('[useNativeEvents]   ⚠️ WARNING: No waiting reminders match this appId!');
+            console.warn('[useNativeEvents]   AppId from event:', rawEvent.appId);
           }
 
           // Convert raw event to AppOpenedEvent format
-          // The activityName contains the unique reminder identifier (e.g., "reminder_abc123")
+          // The appId contains the precise app identifier (e.g., "app_instagram")
           const appOpenedEvent = {
             type: SystemEventType.APP_OPENED,
             timestamp: rawEvent.timestamp,
             data: {
-              bundleId: rawEvent.activityName, // Use activityName to match specific reminder
+              appId: rawEvent.appId, // Precise app identifier for matching
             },
           };
 
-          console.log('[useNativeEvents] 📤 Dispatching event to handleEvent with bundleId:', appOpenedEvent.data.bundleId);
+          console.log('[useNativeEvents] 📤 Dispatching event to handleEvent with appId:', appOpenedEvent.data.appId);
           console.log('=================================================');
 
           handleEvent(appOpenedEvent).catch((error) => {

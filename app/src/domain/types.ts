@@ -48,9 +48,13 @@ export interface LocationConfig {
 }
 
 export interface AppOpenedConfig {
-  bundleId?: string; // e.g., "com.apple.mobilesafari" (legacy)
-  activityName?: string; // Unique DeviceActivity name (e.g., "reminder_abc123")
-  appName: string; // user-friendly name
+  appId: string; // Global app library ID (e.g., "app_instagram")
+  displayName: string; // User-friendly name from global library (e.g., "Instagram")
+
+  // DEPRECATED - kept for backward compatibility during migration
+  bundleId?: string;
+  activityName?: string;
+  appName?: string;
 }
 
 export type TriggerConfig =
@@ -164,7 +168,8 @@ export interface LocationEvent extends SystemEvent {
 export interface AppOpenedEvent extends SystemEvent {
   type: SystemEventType.APP_OPENED;
   data: {
-    bundleId: string;
+    appId: string; // Global app library ID (e.g., "app_instagram")
+    bundleId?: string; // DEPRECATED - kept for backward compatibility
   };
 }
 

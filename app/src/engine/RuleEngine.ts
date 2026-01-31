@@ -22,6 +22,7 @@ import {
   ChargingEvent,
   LocationEvent,
   AppOpenedEvent,
+  AppOpenedConfig,
 } from '../domain';
 
 /**
@@ -196,7 +197,7 @@ export function doesTriggerMatchEvent(
       case SystemEventType.APP_OPENED: {
         const appEvent = event as AppOpenedEvent;
         console.log('[RuleEngine] 📱 Evaluating APP_OPENED event');
-        console.log('[RuleEngine]   Event bundleId (activityName):', appEvent.data.bundleId);
+        console.log('[RuleEngine]   Event appId:', appEvent.data.appId);
         console.log('[RuleEngine]   Event timestamp:', new Date(appEvent.timestamp).toISOString());
 
         if (trigger.type !== TriggerType.APP_OPENED) {
@@ -204,33 +205,20 @@ export function doesTriggerMatchEvent(
           return false;
         }
 
-        // Match by activity name - each reminder has a unique activity name
-        const config = trigger.config as { activityName?: string; bundleId?: string };
-        console.log('[RuleEngine]   Trigger config:', JSON.stringify(config));
+        // PRECISION MATCHING: Match by global app ID
+        const config = trigger.config as AppOpenedConfig;
+        console.log('[RuleEngine]   Trigger config appId:', config.appId);
+        console.log('[RuleEngine]   Trigger config displayName:', config.displayName);
 
-        // New approach: match by activityName
-        if (config?.activityName) {
-          const matches = appEvent.data.bundleId === config.activityName;
-          console.log(`[RuleEngine]   Comparing: "${appEvent.data.bundleId}" === "${config.activityName}"`);
-          console.log(`[RuleEngine]   Match result: ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
+        const matches = appEvent.data.appId === config.appId;
+        console.log(`[RuleEngine]   Comparing: "${appEvent.data.appId}" === "${config.appId}"`);
+        console.log(`[RuleEngine]   Match result: ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
 
-          if (matches) {
-            console.log(`[RuleEngine] ✅ APP_OPENED trigger matched by activity name: ${config.activityName}`);
-            return true;
-          }
-        } else {
-          console.log('[RuleEngine]   ⚠️ No activityName in trigger config');
+        if (matches) {
+          console.log(`[RuleEngine] ✅ APP_OPENED trigger matched! App: ${config.displayName} (${config.appId})`);
         }
 
-        // Legacy fallback: wildcard matching for old reminders
-        const isWildcard = config?.bundleId === 'screentime.apps.selected';
-        if (isWildcard) {
-          console.log(`[RuleEngine] ✅ APP_OPENED trigger matched (legacy wildcard)`);
-          return true;
-        }
-
-        console.log('[RuleEngine]   ❌ No match found for this trigger');
-        return false;
+        return matches;
       }
 
       default:
@@ -284,7 +272,7 @@ export function buildEvaluationContext(
       break;
 
     case SystemEventType.APP_OPENED:
-      context.lastOpenedApp = (event as AppOpenedEvent).data.bundleId;
+      context.lastOpenedApp = (event as AppOpenedEvent).data.appId;
       break;
   }
 
@@ -325,8 +313,8 @@ export function evaluateRules(
     console.log('[RuleEngine] 📱 Reminders with APP_OPENED triggers:', appOpenedReminders.length);
     appOpenedReminders.forEach(r => {
       const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
-      const config = appTrigger?.config as { activityName?: string } | undefined;
-      console.log(`[RuleEngine]   - "${r.title}" (status: ${r.status}, activityName: ${config?.activityName || 'NOT SET'})`);
+      const config = appTrigger?.config as AppOpenedConfig | undefined;
+      console.log(`[RuleEngine]   - "${r.title}" (status: ${r.status}, appId: ${config?.appId || 'NOT SET'})`);
     });
   }
 
