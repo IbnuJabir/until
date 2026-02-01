@@ -33,7 +33,7 @@ export default function PaywallScreen() {
             <View style={styles.featureIconContainer}>
               <MaterialIcons name="location-on" size={24} color={WarmColors.primary} />
             </View>
-            <Text style={styles.featureText}>Remind me when I'm already there</Text>
+            <Text style={styles.featureText}>Remind me when I&apos;m already there</Text>
           </View>
           <View style={styles.feature}>
             <View style={styles.featureIconContainer}>
@@ -45,7 +45,7 @@ export default function PaywallScreen() {
             <View style={styles.featureIconContainer}>
               <MaterialIcons name="battery-charging-full" size={24} color={WarmColors.primary} />
             </View>
-            <Text style={styles.featureText}>Remind me when I'm actually free</Text>
+            <Text style={styles.featureText}>Remind me when I&apos;m actually free</Text>
           </View>
         </View>
 

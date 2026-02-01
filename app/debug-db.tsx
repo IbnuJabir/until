@@ -134,7 +134,7 @@ export default function DebugDatabaseScreen() {
         <View style={styles.instructionsCard}>
           <Text style={styles.instructionsTitle}>How to use:</Text>
           <Text style={styles.instructionStep}>
-            1. Tap "Export Database File"
+            1. Tap &quot;Export Database File&quot;
           </Text>
           <Text style={styles.instructionStep}>
             2. Choose how to transfer (AirDrop, Files, Email, etc.)
@@ -150,16 +150,16 @@ export default function DebugDatabaseScreen() {
         <View style={styles.tipsCard}>
           <Text style={styles.tipsTitle}>💡 Tips:</Text>
           <Text style={styles.tipText}>
-            • AirDrop is the fastest method
+            &bull; AirDrop is the fastest method
           </Text>
           <Text style={styles.tipText}>
-            • The file is named "until.db"
+            &bull; The file is named &quot;until.db&quot;
           </Text>
           <Text style={styles.tipText}>
-            • You can view all tables and run SQL queries
+            &bull; You can view all tables and run SQL queries
           </Text>
           <Text style={styles.tipText}>
-            • Changes in DB Browser won't affect your app
+            &bull; Changes in DB Browser won&apos;t affect your app
           </Text>
         </View>
       </View>

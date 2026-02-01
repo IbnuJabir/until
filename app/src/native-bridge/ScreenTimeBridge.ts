@@ -33,10 +33,10 @@ export type ScreenTimeAuthorizationStatus =
 
 export interface AppSelectionResult {
   selectedCount: number;
-  apps?: Array<{
+  apps?: {
     type: 'app' | 'category' | 'webdomain';
     id: number;
-  }>;
+  }[];
   appCount?: number;
   categoryCount?: number;
   webDomainCount?: number;

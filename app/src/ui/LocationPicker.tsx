@@ -212,7 +212,7 @@ export default function LocationPicker({
               <Text style={styles.radiusValue}>{radius}m</Text>
             </View>
             <Text style={styles.radiusDescription}>
-              You'll be notified when you're within this distance
+              You&apos;ll be notified when you&apos;re within this distance
             </Text>
 
             {/* Simple Radius Selector (buttons instead of slider) */}
@@ -241,7 +241,7 @@ export default function LocationPicker({
 
           {/* Info */}
           <View style={styles.infoBox}>
-            <Text style={styles.infoIcon}>ℹ️</Text>
+            <Text style={styles.infoIcon}>&#x2139;&#xFE0F;</Text>
             <Text style={styles.infoText}>
               We use geofencing, not continuous GPS tracking. Your location is only
               checked when entering the selected area.

@@ -275,9 +275,9 @@ export default function VoiceReminderScreen() {
             <Text style={styles.instructionsText}>
               Try saying:
             </Text>
-            <Text style={styles.exampleText}>• "Remind me to buy milk at the store"</Text>
-            <Text style={styles.exampleText}>• "Call mom tomorrow at 3pm"</Text>
-            <Text style={styles.exampleText}>• "Take medicine when I plug in my phone"</Text>
+            <Text style={styles.exampleText}>• &quot;Remind me to buy milk at the store&quot;</Text>
+            <Text style={styles.exampleText}>• &quot;Call mom tomorrow at 3pm&quot;</Text>
+            <Text style={styles.exampleText}>• &quot;Take medicine when I plug in my phone&quot;</Text>
           </View>
         )}
 
@@ -341,7 +341,7 @@ export default function VoiceReminderScreen() {
               <View style={styles.lowConfidenceWarning}>
                 <MaterialIcons name="warning" size={16} color={WarmColors.warning} />
                 <Text style={styles.lowConfidenceText}>
-                  I'm not entirely sure I understood correctly. Please review before creating.
+                  I&apos;m not entirely sure I understood correctly. Please review before creating.
                 </Text>
               </View>
             )}
