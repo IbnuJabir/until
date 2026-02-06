@@ -20,6 +20,12 @@ import {
 import { handleSystemEvent } from '../engine/RuleEngine';
 
 /**
+ * Global event processing lock to prevent race conditions
+ * Tracks which reminders are currently being processed to avoid firing the same reminder twice
+ */
+const processingReminders = new Set<string>();
+
+/**
  * System state (battery, location, etc.)
  */
 export interface SystemState {
@@ -478,8 +484,16 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
     }
     console.log('=================================================');
 
-    // Fire notification handler
+    // Fire notification handler with race condition protection
     const fireNotification = async (reminder: Reminder) => {
+      // Check if this reminder is already being processed (prevent double-fire race condition)
+      if (processingReminders.has(reminder.id)) {
+        console.warn(`[Store] ⚠️ Reminder ${reminder.id} is already being processed, skipping to prevent duplicate fire`);
+        return;
+      }
+
+      processingReminders.add(reminder.id);
+
       const { fireNotification: fireNotificationService } = await import(
         '../utils/NotificationService'
       );
@@ -491,6 +505,9 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       } catch (error) {
         console.error(`[Store] ❌ Failed to fire notification:`, error);
         throw error;
+      } finally {
+        // Remove from processing set after completion (success or failure)
+        processingReminders.delete(reminder.id);
       }
     };
 
