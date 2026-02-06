@@ -57,6 +57,15 @@ export function validateTrigger(trigger: Trigger): boolean {
       return trigger.config
         ? validateTimeWindow(trigger.config as TimeWindowConfig)
         : false;
+    case TriggerType.SCHEDULED_TIME: {
+      // SCHEDULED_TIME must have a config with scheduledDateTime in the future
+      const config = trigger.config as any;
+      if (!config || !config.scheduledDateTime) {
+        return false;
+      }
+      // Scheduled time must be in the future
+      return config.scheduledDateTime > Date.now();
+    }
     case TriggerType.LOCATION_ENTER:
       return trigger.config
         ? validateLocation(trigger.config as LocationConfig)
