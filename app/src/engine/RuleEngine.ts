@@ -23,6 +23,7 @@ import {
   LocationEvent,
   AppOpenedEvent,
   AppOpenedConfig,
+  ScheduledTimeFiredEvent,
 } from '../domain';
 
 /**
@@ -221,6 +222,25 @@ export function doesTriggerMatchEvent(
         return matches;
       }
 
+      case SystemEventType.SCHEDULED_TIME_FIRED: {
+        const scheduledEvent = event as ScheduledTimeFiredEvent;
+        console.log('[RuleEngine] ⏰ Evaluating SCHEDULED_TIME_FIRED event');
+        console.log('[RuleEngine]   Event reminderId:', scheduledEvent.data.reminderId);
+        console.log('[RuleEngine]   Event timestamp:', new Date(scheduledEvent.timestamp).toISOString());
+
+        if (trigger.type !== TriggerType.SCHEDULED_TIME) {
+          console.log('[RuleEngine]   ❌ Trigger type mismatch:', trigger.type);
+          return false;
+        }
+
+        // For SCHEDULED_TIME, we match by reminder ID
+        // The scheduled notification was set up for this specific reminder
+        const matches = true; // Scheduled time firing means the reminder ID matches
+        console.log(`[RuleEngine] ✅ SCHEDULED_TIME trigger matched for reminder: ${scheduledEvent.data.reminderId}`);
+
+        return matches;
+      }
+
       default:
         return false;
     }
@@ -234,6 +254,19 @@ export function getRemindersListeningTo(
   reminders: Reminder[],
   event: SystemEvent
 ): Reminder[] {
+  // Special handling for SCHEDULED_TIME_FIRED: only return the specific reminder
+  if (event.type === SystemEventType.SCHEDULED_TIME_FIRED) {
+    const scheduledEvent = event as ScheduledTimeFiredEvent;
+    const reminder = reminders.find((r) => r.id === scheduledEvent.data.reminderId);
+    if (reminder && reminder.status === ReminderStatus.WAITING) {
+      console.log(`[RuleEngine] Found matching reminder for SCHEDULED_TIME_FIRED: ${reminder.title}`);
+      return [reminder];
+    }
+    console.log(`[RuleEngine] ⚠️ No waiting reminder found for SCHEDULED_TIME_FIRED with ID: ${scheduledEvent.data.reminderId}`);
+    return [];
+  }
+
+  // For other event types, use the normal trigger matching
   return reminders.filter(
     (reminder) =>
       reminder.status === ReminderStatus.WAITING &&
