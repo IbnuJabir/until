@@ -21,20 +21,35 @@ export default function RootLayout() {
   // Initialize native event listeners
   useNativeEvents();
 
-  // Handle notification received (mark reminder as fired)
+  // Handle notification received (emit SCHEDULED_TIME_FIRED event for rule engine evaluation)
   useEffect(() => {
     const receivedSubscription = Notifications.addNotificationReceivedListener(
       async (notification) => {
         const reminderId = notification.request.content.data?.reminderId;
 
         if (reminderId && typeof reminderId === 'string') {
-          console.log('[App] Scheduled notification received, marking reminder as fired:', reminderId);
+          console.log('[App] 📢 Scheduled notification received for reminder:', reminderId);
+          console.log('[App] Emitting SCHEDULED_TIME_FIRED event to rule engine...');
 
           try {
-            await fireReminder(reminderId);
-            console.log('[App] ✅ Reminder marked as fired:', reminderId);
+            // Import SystemEventType and handleEvent from store
+            const { useReminderStore } = await import('@/app/src/store/reminderStore');
+            const { SystemEventType } = await import('@/app/src/domain');
+            const store = useReminderStore.getState();
+
+            // Emit SCHEDULED_TIME_FIRED event so rule engine can evaluate conditions
+            const scheduledTimeEvent = {
+              type: SystemEventType.SCHEDULED_TIME_FIRED,
+              timestamp: Date.now(),
+              data: {
+                reminderId,
+              },
+            };
+
+            console.log('[App] ✅ Dispatching SCHEDULED_TIME_FIRED event to rule engine');
+            await store.handleEvent(scheduledTimeEvent);
           } catch (error) {
-            console.error('[App] Failed to mark reminder as fired:', error);
+            console.error('[App] ❌ Failed to handle scheduled time event:', error);
           }
         }
       }
@@ -43,7 +58,7 @@ export default function RootLayout() {
     return () => {
       receivedSubscription.remove();
     };
-  }, [fireReminder]);
+  }, []);
 
   // Handle notification tap (deep link to reminder detail)
   useEffect(() => {
