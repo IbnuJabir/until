@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { NativeModules } from 'react-native';
 import { useReminderStore } from '../store/reminderStore';
 import { subscribeToAppBecameActive } from '../native-bridge/AppLifecycleBridge';
 import {
@@ -41,40 +42,61 @@ export function useNativeEvents() {
   // Re-register geofences on app startup (iOS clears them on app restart)
   useEffect(() => {
     const registerStoredGeofences = async () => {
-      const { registerGeofence } = await import('../native-bridge/LocationBridge');
-
       // Wait for reminders to load
       if (reminders.length === 0) return;
 
-      console.log('[useNativeEvents] Re-registering geofences for location-based reminders...');
+      // Check if we have any location-based reminders before importing
+      const hasLocationReminders = reminders.some(r =>
+        r.status === 'waiting' &&
+        r.triggers.some(t => t.type === TriggerType.LOCATION_ENTER)
+      );
 
-      let registeredCount = 0;
-      for (const reminder of reminders) {
-        // Only register for active reminders
-        if (reminder.status !== 'waiting') continue;
+      if (!hasLocationReminders) {
+        console.log('[useNativeEvents] No active location-based reminders to register');
+        return;
+      }
 
-        for (const trigger of reminder.triggers) {
-          if (trigger.type === TriggerType.LOCATION_ENTER && trigger.config) {
-            const locationConfig = trigger.config as any;
+      try {
+        // Check if LocationModule is available
+        if (!NativeModules.LocationModule) {
+          console.warn('[useNativeEvents] LocationModule not available - skipping geofence registration. Make sure iOS project is built.');
+          return;
+        }
 
-            try {
-              await registerGeofence(
-                `reminder_${reminder.id}`,
-                locationConfig.latitude,
-                locationConfig.longitude,
-                locationConfig.radius
-              );
-              registeredCount++;
-              console.log(`[useNativeEvents] Registered geofence for: ${reminder.title}`);
-            } catch (error) {
-              console.error(`[useNativeEvents] Failed to register geofence for ${reminder.title}:`, error);
+        const { registerGeofence } = await import('../native-bridge/LocationBridge');
+
+        console.log('[useNativeEvents] Re-registering geofences for location-based reminders...');
+
+        let registeredCount = 0;
+        for (const reminder of reminders) {
+          // Only register for active reminders
+          if (reminder.status !== 'waiting') continue;
+
+          for (const trigger of reminder.triggers) {
+            if (trigger.type === TriggerType.LOCATION_ENTER && trigger.config) {
+              const locationConfig = trigger.config as any;
+
+              try {
+                await registerGeofence(
+                  `reminder_${reminder.id}`,
+                  locationConfig.latitude,
+                  locationConfig.longitude,
+                  locationConfig.radius
+                );
+                registeredCount++;
+                console.log(`[useNativeEvents] Registered geofence for: ${reminder.title}`);
+              } catch (error) {
+                console.error(`[useNativeEvents] Failed to register geofence for ${reminder.title}:`, error);
+              }
             }
           }
         }
-      }
 
-      if (registeredCount > 0) {
-        console.log(`[useNativeEvents] Successfully re-registered ${registeredCount} geofence(s)`);
+        if (registeredCount > 0) {
+          console.log(`[useNativeEvents] Successfully re-registered ${registeredCount} geofence(s)`);
+        }
+      } catch (error) {
+        console.error('[useNativeEvents] Error during geofence registration:', error);
       }
     };
 
