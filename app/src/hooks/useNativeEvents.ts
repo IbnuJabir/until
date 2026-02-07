@@ -18,18 +18,25 @@ import { SystemEventType, ReminderStatus, TriggerType, LocationConfig } from '..
 export function useNativeEvents() {
   const handleEvent = useReminderStore((state) => state.handleEvent);
   const reminders = useReminderStore((state) => state.reminders);
+  const isLoading = useReminderStore((state) => state.isLoading);
   const loadFromStorage = useReminderStore((state) => state.loadFromStorage);
   const lastProcessedEventRef = useRef<string | null>(null);
+  const listenersSetupRef = useRef(false); // Track if listeners are already set up
+  const dbLoadedRef = useRef(false); // Track if database load has completed
 
-  // Load reminders from database on mount
+  // Load reminders from database on mount - MUST complete before event listeners start
   useEffect(() => {
     console.log('[useNativeEvents] Loading reminders from database...');
-    loadFromStorage().then(() => {
-      console.log('[useNativeEvents] Database loaded successfully');
-    }).catch((error) => {
-      console.error('[useNativeEvents] Failed to load database:', error);
-    });
-  }, []);
+    loadFromStorage()
+      .then(() => {
+        dbLoadedRef.current = true;
+        console.log('[useNativeEvents] ✅ Database loaded successfully');
+      })
+      .catch((error) => {
+        dbLoadedRef.current = true; // Mark as done even on error to prevent hanging
+        console.error('[useNativeEvents] ❌ Failed to load database:', error);
+      });
+  }, [loadFromStorage]);
 
   // Re-register geofences on app startup (iOS clears them on app restart)
   useEffect(() => {
@@ -75,7 +82,20 @@ export function useNativeEvents() {
   }, [reminders.length]); // Run when reminders are loaded
 
   useEffect(() => {
-    console.log('[useNativeEvents] Setting up native event listeners...');
+    // Only set up listeners ONCE and ONLY after database is fully loaded
+    if (!dbLoadedRef.current) {
+      console.log('[useNativeEvents] ⏳ Waiting for database to load... (will retry)');
+      return;
+    }
+
+    if (listenersSetupRef.current) {
+      console.log('[useNativeEvents] Listeners already set up, skipping...');
+      return;
+    }
+
+    listenersSetupRef.current = true;
+
+    console.log('[useNativeEvents] ✅ Database loaded. Setting up native event listeners...');
     console.log('[useNativeEvents] Current reminders count:', reminders.length);
 
     // Enable battery monitoring on app startup
@@ -238,5 +258,5 @@ export function useNativeEvents() {
         console.error('[useNativeEvents] Failed to disable battery monitoring:', error);
       });
     };
-  }, [handleEvent, reminders.length]);
+  }, [handleEvent]); // Only depend on handleEvent - dbLoadedRef is checked inside effect
 }

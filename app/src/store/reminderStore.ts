@@ -20,6 +20,12 @@ import {
 import { handleSystemEvent } from '../engine/RuleEngine';
 
 /**
+ * Global event processing lock to prevent race conditions
+ * Tracks which reminders are currently being processed to avoid firing the same reminder twice
+ */
+const processingReminders = new Set<string>();
+
+/**
  * System state (battery, location, etc.)
  */
 export interface SystemState {
@@ -128,7 +134,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
       // Register geofences for location triggers
       for (const trigger of reminder.triggers) {
-        if (trigger.type === 'LOCATION_ENTER' && trigger.config) {
+        if (trigger.type === TriggerType.LOCATION_ENTER && trigger.config) {
           const { registerGeofence } = await import('../native-bridge/LocationBridge');
           const locationConfig = trigger.config as {
             latitude: number;
@@ -154,7 +160,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
       // Schedule notifications for SCHEDULED_TIME triggers
       for (const trigger of reminder.triggers) {
-        if (trigger.type === 'SCHEDULED_TIME' && trigger.config) {
+        if (trigger.type === TriggerType.SCHEDULED_TIME && trigger.config) {
           const { scheduleNotificationAtTime } = await import('../utils/NotificationService');
           const scheduledConfig = trigger.config as {
             scheduledDateTime: number;
@@ -228,7 +234,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
     // If reactivating a reminder (setting status to WAITING), restart monitoring for APP_OPENED triggers
     if (status === ReminderStatus.WAITING && reminder) {
       for (const trigger of reminder.triggers) {
-        if (trigger.type === 'APP_OPENED' && trigger.config) {
+        if (trigger.type === TriggerType.APP_OPENED && trigger.config) {
           const { startMonitoring } = await import('../native-bridge/ScreenTimeBridge');
           const config = trigger.config as { activityName?: string; bundleId?: string; appName: string };
 
@@ -270,7 +276,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       // Unregister geofences for location triggers and cancel scheduled notifications
       if (reminder) {
         for (const trigger of reminder.triggers) {
-          if (trigger.type === 'LOCATION_ENTER') {
+          if (trigger.type === TriggerType.LOCATION_ENTER) {
             const { unregisterGeofence } = await import('../native-bridge/LocationBridge');
 
             try {
@@ -332,7 +338,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       for (const reminder of remindersToDelete) {
         // Unregister geofences for location triggers
         for (const trigger of reminder.triggers) {
-          if (trigger.type === 'LOCATION_ENTER') {
+          if (trigger.type === TriggerType.LOCATION_ENTER) {
             const { unregisterGeofence } = await import('../native-bridge/LocationBridge');
 
             try {
@@ -478,8 +484,16 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
     }
     console.log('=================================================');
 
-    // Fire notification handler
+    // Fire notification handler with race condition protection
     const fireNotification = async (reminder: Reminder) => {
+      // Check if this reminder is already being processed (prevent double-fire race condition)
+      if (processingReminders.has(reminder.id)) {
+        console.warn(`[Store] ⚠️ Reminder ${reminder.id} is already being processed, skipping to prevent duplicate fire`);
+        return;
+      }
+
+      processingReminders.add(reminder.id);
+
       const { fireNotification: fireNotificationService } = await import(
         '../utils/NotificationService'
       );
@@ -491,6 +505,9 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       } catch (error) {
         console.error(`[Store] ❌ Failed to fire notification:`, error);
         throw error;
+      } finally {
+        // Remove from processing set after completion (success or failure)
+        processingReminders.delete(reminder.id);
       }
     };
 

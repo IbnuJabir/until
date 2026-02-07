@@ -139,6 +139,7 @@ export enum SystemEventType {
   CHARGING_STATE_CHANGED = 'CHARGING_STATE_CHANGED',
   LOCATION_REGION_ENTERED = 'LOCATION_REGION_ENTERED',
   APP_OPENED = 'APP_OPENED',
+  SCHEDULED_TIME_FIRED = 'SCHEDULED_TIME_FIRED', // When a scheduled notification fires
 }
 
 export interface SystemEvent {
@@ -170,6 +171,13 @@ export interface AppOpenedEvent extends SystemEvent {
   data: {
     appId: string; // Global app library ID (e.g., "app_instagram")
     bundleId?: string; // DEPRECATED - kept for backward compatibility
+  };
+}
+
+export interface ScheduledTimeFiredEvent extends SystemEvent {
+  type: SystemEventType.SCHEDULED_TIME_FIRED;
+  data: {
+    reminderId: string; // The reminder that was scheduled to fire
   };
 }
 

@@ -45,7 +45,8 @@ export async function initDatabase(): Promise<void> {
       status TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       fired_at INTEGER,
-      expires_at INTEGER
+      expires_at INTEGER,
+      notification_id TEXT
     );
   `);
 
@@ -148,8 +149,8 @@ export async function saveReminder(reminder: Reminder): Promise<void> {
 
     // Insert or replace reminder
     db.runSync(
-      `INSERT OR REPLACE INTO reminders (id, title, description, status, created_at, fired_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT OR REPLACE INTO reminders (id, title, description, status, created_at, fired_at, expires_at, notification_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         reminder.id,
         reminder.title,
@@ -158,6 +159,7 @@ export async function saveReminder(reminder: Reminder): Promise<void> {
         reminder.createdAt,
         reminder.firedAt || null,
         reminder.expiresAt || null,
+        reminder.notificationId || null,
       ]
     );
 
@@ -253,6 +255,7 @@ export async function loadAllReminders(): Promise<Reminder[]> {
         createdAt: row.created_at,
         firedAt: row.fired_at || undefined,
         expiresAt: row.expires_at || undefined,
+        notificationId: row.notification_id || undefined,
       };
 
       reminders.push(reminder);
@@ -332,6 +335,7 @@ export async function getReminderById(id: string): Promise<Reminder | null> {
       createdAt: reminderRow.created_at,
       firedAt: reminderRow.fired_at || undefined,
       expiresAt: reminderRow.expires_at || undefined,
+      notificationId: reminderRow.notification_id || undefined,
     };
   } catch (error) {
     console.error('[Database] Failed to get reminder:', error);
