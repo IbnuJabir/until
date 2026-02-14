@@ -420,10 +420,16 @@ export async function handleSystemEvent(
   // Fire notifications and update state
   for (const reminder of remindersToFire) {
     try {
-      console.log(`[RuleEngine] Firing notification for: ${reminder.title}`);
+      console.log(`[RuleEngine] Processing reminder: ${reminder.title}`);
 
-      // Fire notification
-      await fireNotification(reminder);
+      // For SCHEDULED_TIME_FIRED events, the notification already fired
+      // We only need to update the reminder status (prevent duplicate notification)
+      if (event.type !== SystemEventType.SCHEDULED_TIME_FIRED) {
+        console.log(`[RuleEngine] Calling fireNotification for event type: ${event.type}`);
+        await fireNotification(reminder);
+      } else {
+        console.log(`[RuleEngine] Skipping fireNotification for SCHEDULED_TIME_FIRED (notification already fired)`);
+      }
 
       // Mark as fired (fire once guarantee)
       const firedReminder: Reminder = {

@@ -3,7 +3,8 @@
  * Connects native modules to the Zustand store
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { NativeModules } from 'react-native';
 import { useReminderStore } from '../store/reminderStore';
 import { subscribeToAppBecameActive } from '../native-bridge/AppLifecycleBridge';
 import {
@@ -22,18 +23,18 @@ export function useNativeEvents() {
   const loadFromStorage = useReminderStore((state) => state.loadFromStorage);
   const lastProcessedEventRef = useRef<string | null>(null);
   const listenersSetupRef = useRef(false); // Track if listeners are already set up
-  const dbLoadedRef = useRef(false); // Track if database load has completed
+  const [dbLoaded, setDbLoaded] = useState(false); // Track if database load has completed
 
   // Load reminders from database on mount - MUST complete before event listeners start
   useEffect(() => {
     console.log('[useNativeEvents] Loading reminders from database...');
     loadFromStorage()
       .then(() => {
-        dbLoadedRef.current = true;
+        setDbLoaded(true);
         console.log('[useNativeEvents] ✅ Database loaded successfully');
       })
       .catch((error) => {
-        dbLoadedRef.current = true; // Mark as done even on error to prevent hanging
+        setDbLoaded(true); // Mark as done even on error to prevent hanging
         console.error('[useNativeEvents] ❌ Failed to load database:', error);
       });
   }, [loadFromStorage]);
@@ -41,40 +42,61 @@ export function useNativeEvents() {
   // Re-register geofences on app startup (iOS clears them on app restart)
   useEffect(() => {
     const registerStoredGeofences = async () => {
-      const { registerGeofence } = await import('../native-bridge/LocationBridge');
-
       // Wait for reminders to load
       if (reminders.length === 0) return;
 
-      console.log('[useNativeEvents] Re-registering geofences for location-based reminders...');
+      // Check if we have any location-based reminders before importing
+      const hasLocationReminders = reminders.some(r =>
+        r.status === 'waiting' &&
+        r.triggers.some(t => t.type === TriggerType.LOCATION_ENTER)
+      );
 
-      let registeredCount = 0;
-      for (const reminder of reminders) {
-        // Only register for active reminders
-        if (reminder.status !== 'waiting') continue;
+      if (!hasLocationReminders) {
+        console.log('[useNativeEvents] No active location-based reminders to register');
+        return;
+      }
 
-        for (const trigger of reminder.triggers) {
-          if (trigger.type === TriggerType.LOCATION_ENTER && trigger.config) {
-            const locationConfig = trigger.config as any;
+      try {
+        // Check if LocationModule is available
+        if (!NativeModules.LocationModule) {
+          console.warn('[useNativeEvents] LocationModule not available - skipping geofence registration. Make sure iOS project is built.');
+          return;
+        }
 
-            try {
-              await registerGeofence(
-                `reminder_${reminder.id}`,
-                locationConfig.latitude,
-                locationConfig.longitude,
-                locationConfig.radius
-              );
-              registeredCount++;
-              console.log(`[useNativeEvents] Registered geofence for: ${reminder.title}`);
-            } catch (error) {
-              console.error(`[useNativeEvents] Failed to register geofence for ${reminder.title}:`, error);
+        const { registerGeofence } = await import('../native-bridge/LocationBridge');
+
+        console.log('[useNativeEvents] Re-registering geofences for location-based reminders...');
+
+        let registeredCount = 0;
+        for (const reminder of reminders) {
+          // Only register for active reminders
+          if (reminder.status !== 'waiting') continue;
+
+          for (const trigger of reminder.triggers) {
+            if (trigger.type === TriggerType.LOCATION_ENTER && trigger.config) {
+              const locationConfig = trigger.config as any;
+
+              try {
+                await registerGeofence(
+                  `reminder_${reminder.id}`,
+                  locationConfig.latitude,
+                  locationConfig.longitude,
+                  locationConfig.radius
+                );
+                registeredCount++;
+                console.log(`[useNativeEvents] Registered geofence for: ${reminder.title}`);
+              } catch (error) {
+                console.error(`[useNativeEvents] Failed to register geofence for ${reminder.title}:`, error);
+              }
             }
           }
         }
-      }
 
-      if (registeredCount > 0) {
-        console.log(`[useNativeEvents] Successfully re-registered ${registeredCount} geofence(s)`);
+        if (registeredCount > 0) {
+          console.log(`[useNativeEvents] Successfully re-registered ${registeredCount} geofence(s)`);
+        }
+      } catch (error) {
+        console.error('[useNativeEvents] Error during geofence registration:', error);
       }
     };
 
@@ -83,8 +105,8 @@ export function useNativeEvents() {
 
   useEffect(() => {
     // Only set up listeners ONCE and ONLY after database is fully loaded
-    if (!dbLoadedRef.current) {
-      console.log('[useNativeEvents] ⏳ Waiting for database to load... (will retry)');
+    if (!dbLoaded) {
+      console.log('[useNativeEvents] ⏳ Waiting for database to load...');
       return;
     }
 
@@ -95,8 +117,10 @@ export function useNativeEvents() {
 
     listenersSetupRef.current = true;
 
+    // Read fresh reminders from store for logging (avoid stale closure)
+    const currentReminders = useReminderStore.getState().reminders;
     console.log('[useNativeEvents] ✅ Database loaded. Setting up native event listeners...');
-    console.log('[useNativeEvents] Current reminders count:', reminders.length);
+    console.log('[useNativeEvents] Current reminders count:', currentReminders.length);
 
     // Enable battery monitoring on app startup
     enableBatteryMonitoring().catch((error) => {
@@ -105,10 +129,11 @@ export function useNativeEvents() {
 
     // Subscribe to phone unlock / app became active events
     const unsubscribeAppLifecycle = subscribeToAppBecameActive((event) => {
+      const storeReminders = useReminderStore.getState().reminders;
       console.log('=================================================');
       console.log('[useNativeEvents] 🔔 APP_BECAME_ACTIVE event received!');
       console.log('[useNativeEvents] Event timestamp:', new Date(event.timestamp).toISOString());
-      console.log('[useNativeEvents] Active reminders:', reminders.filter(r => r.status === ReminderStatus.WAITING).length);
+      console.log('[useNativeEvents] Active reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
       console.log('=================================================');
 
       handleEvent(event).catch((error) => {
@@ -118,11 +143,12 @@ export function useNativeEvents() {
 
     // Subscribe to charging state changes
     const unsubscribeCharging = subscribeToChargingStateChanges((event) => {
+      const storeReminders = useReminderStore.getState().reminders;
       console.log('=================================================');
       console.log('[useNativeEvents] 🔋 CHARGING_STATE_CHANGED event received!');
       console.log('[useNativeEvents] Event timestamp:', new Date(event.timestamp).toISOString());
       console.log('[useNativeEvents] Is charging:', event.data.isCharging);
-      console.log('[useNativeEvents] Active reminders:', reminders.filter(r => r.status === ReminderStatus.WAITING).length);
+      console.log('[useNativeEvents] Active reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
       console.log('=================================================');
 
       handleEvent(event).catch((error) => {
@@ -132,12 +158,13 @@ export function useNativeEvents() {
 
     // Subscribe to location region entered events
     const unsubscribeLocation = subscribeToRegionEntered((event) => {
+      const storeReminders = useReminderStore.getState().reminders;
       console.log('=================================================');
       console.log('[useNativeEvents] 📍 LOCATION_REGION_ENTERED event received!');
       console.log('[useNativeEvents] Event timestamp:', new Date(event.timestamp).toISOString());
       console.log('[useNativeEvents] Location:', event.data.latitude, event.data.longitude);
       console.log('[useNativeEvents] Identifier:', event.data.identifier);
-      console.log('[useNativeEvents] Active reminders:', reminders.filter(r => r.status === ReminderStatus.WAITING).length);
+      console.log('[useNativeEvents] Active reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
       console.log('=================================================');
 
       handleEvent(event).catch((error) => {
@@ -173,6 +200,9 @@ export function useNativeEvents() {
         }
 
         if (rawEvent) {
+          // Read fresh reminders from store for validation logging
+          const storeReminders = useReminderStore.getState().reminders;
+
           console.log('=================================================');
           console.log('[useNativeEvents] 📱 RAW APP_OPENED EVENT DETECTED');
           console.log('[useNativeEvents] Raw event data:', JSON.stringify(rawEvent, null, 2));
@@ -200,7 +230,7 @@ export function useNativeEvents() {
           lastProcessedEventRef.current = eventId;
 
           // Check if any waiting reminders have this appId
-          const matchingReminders = reminders.filter(r => {
+          const matchingReminders = storeReminders.filter(r => {
             if (r.status !== ReminderStatus.WAITING) return false;
             const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
             if (!appTrigger) return false;
@@ -209,8 +239,8 @@ export function useNativeEvents() {
           });
 
           console.log('[useNativeEvents] 🔍 Validation:');
-          console.log('[useNativeEvents]   Total reminders:', reminders.length);
-          console.log('[useNativeEvents]   Waiting reminders:', reminders.filter(r => r.status === ReminderStatus.WAITING).length);
+          console.log('[useNativeEvents]   Total reminders:', storeReminders.length);
+          console.log('[useNativeEvents]   Waiting reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
           console.log('[useNativeEvents]   Matching reminders for appId:', matchingReminders.length);
 
           if (matchingReminders.length > 0) {
@@ -258,5 +288,5 @@ export function useNativeEvents() {
         console.error('[useNativeEvents] Failed to disable battery monitoring:', error);
       });
     };
-  }, [handleEvent]); // Only depend on handleEvent - dbLoadedRef is checked inside effect
+  }, [handleEvent, dbLoaded]); // Re-run when dbLoaded changes to true, ensuring listeners are set up after DB load
 }
