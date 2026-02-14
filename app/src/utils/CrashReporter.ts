@@ -13,12 +13,14 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 // ---------------------------------------------------------------------------
-// Configuration - replace with your actual Telegram bot token and chat ID
+// Configuration - loaded from environment variables
 // ---------------------------------------------------------------------------
-const TELEGRAM_BOT_TOKEN = 'TELEGRAM_BOT_TOKEN';
-const TELEGRAM_CHAT_ID = 'TELEGRAM_CHAT_ID';
+const TELEGRAM_BOT_TOKEN = process.env.EXPO_PUBLIC_TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.EXPO_PUBLIC_TELEGRAM_CHAT_ID || '';
 
-const SEND_MESSAGE_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+const SEND_MESSAGE_URL = TELEGRAM_BOT_TOKEN
+  ? `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`
+  : '';
 
 // ---------------------------------------------------------------------------
 // Rate limiting
@@ -100,6 +102,14 @@ function escapeMarkdown(text: string): string {
 }
 
 async function sendToTelegram(message: string): Promise<void> {
+  // Skip sending if credentials are not configured
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    if (__DEV__) {
+      console.warn('[CrashReporter] Telegram credentials not configured. Set EXPO_PUBLIC_TELEGRAM_BOT_TOKEN and EXPO_PUBLIC_TELEGRAM_CHAT_ID in your .env file.');
+    }
+    return;
+  }
+
   try {
     const response = await fetch(SEND_MESSAGE_URL, {
       method: 'POST',
