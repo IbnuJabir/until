@@ -11,7 +11,7 @@ import { Toast } from '@/app/src/utils/Toast';
 import { BorderRadius, Elevation, Spacing, Typography, WarmColors } from '@/constants/theme';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -40,6 +40,7 @@ export default function RemindersScreen() {
   const [showToast, setShowToast] = useState(false);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const isNavigatingRef = useRef(false);
 
   // Load reminders on mount
   useEffect(() => {
@@ -136,7 +137,9 @@ export default function RemindersScreen() {
     );
   };
 
-  const handleCreateReminder = () => {
+  const handleCreateReminder = useCallback(() => {
+    if (isNavigatingRef.current) return;
+
     if (!canAddMoreReminders()) {
       Alert.alert(
         'Upgrade Required',
@@ -149,8 +152,10 @@ export default function RemindersScreen() {
       return;
     }
 
+    isNavigatingRef.current = true;
     router.push('/create-reminder' as any);
-  };
+    setTimeout(() => { isNavigatingRef.current = false; }, 1000);
+  }, [canAddMoreReminders, router]);
 
   const activeReminders = reminders.filter((r) => r.status === ReminderStatus.WAITING);
   const firedReminders = reminders.filter((r) => r.status === ReminderStatus.FIRED);
@@ -267,6 +272,9 @@ export default function RemindersScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={renderEmptyState}
+        windowSize={7}
+        maxToRenderPerBatch={10}
+        removeClippedSubviews={true}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -310,7 +318,7 @@ export default function RemindersScreen() {
       <Toast
         message={toastMessage}
         visible={showToast}
-        duration={2000}
+        duration={3000}
         onHide={() => setShowToast(false)}
       />
     </View>

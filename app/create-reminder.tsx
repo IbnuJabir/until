@@ -710,6 +710,7 @@ export default function CreateReminderScreen() {
                   value={title}
                   onChangeText={setTitle}
                   returnKeyType="next"
+                  maxLength={100}
                 />
               </View>
 
@@ -725,6 +726,7 @@ export default function CreateReminderScreen() {
                   multiline
                   numberOfLines={3}
                   textAlignVertical="top"
+                  maxLength={500}
                 />
               </View>
 

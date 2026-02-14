@@ -127,6 +127,15 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
     try {
       const currentReminders = get().reminders;
 
+      // Rate limiting: prevent more than 5 reminders per minute
+      const oneMinuteAgo = Date.now() - 60000;
+      const recentCount = currentReminders.filter(
+        (r) => r.createdAt > oneMinuteAgo
+      ).length;
+      if (recentCount >= 5) {
+        throw new Error('Too many reminders created recently. Please wait a moment.');
+      }
+
       // Check if user can add more reminders (free tier limit)
       if (!get().canAddMoreReminders()) {
         throw new Error('Free tier limit reached. Upgrade to add more reminders.');
@@ -150,7 +159,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
               locationConfig.longitude,
               locationConfig.radius
             );
-            console.log(`[Store] Registered geofence for reminder: ${reminder.title}`);
+            if (__DEV__) console.log(`[Store] Registered geofence for reminder: ${reminder.title}`);
           } catch (error) {
             console.error('[Store] Failed to register geofence:', error);
             // Don't fail the whole operation, just log the error
@@ -175,7 +184,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
             // Store notification ID for later cancellation
             reminder.notificationId = notificationId;
 
-            console.log(`[Store] Scheduled notification for reminder: ${reminder.title} at ${new Date(scheduledConfig.scheduledDateTime).toLocaleString()}`);
+            if (__DEV__) console.log(`[Store] Scheduled notification for reminder: ${reminder.title} at ${new Date(scheduledConfig.scheduledDateTime).toLocaleString()}`);
           } catch (error) {
             console.error('[Store] Failed to schedule notification:', error);
             // Don't fail the whole operation, just log the error
@@ -241,10 +250,12 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
           if (config.activityName) {
             try {
               const result = await startMonitoring(config.activityName);
-              if (result.success) {
-                console.log(`[Store] Restarted monitoring for reactivated reminder: ${reminder.title}`);
-              } else {
-                console.warn(`[Store] Failed to restart monitoring for: ${reminder.title}`);
+              if (__DEV__) {
+                if (result.success) {
+                  console.log(`[Store] Restarted monitoring for reactivated reminder: ${reminder.title}`);
+                } else {
+                  console.warn(`[Store] Failed to restart monitoring for: ${reminder.title}`);
+                }
               }
             } catch (error) {
               console.error(`[Store] Error restarting monitoring for ${reminder.title}:`, error);
@@ -281,9 +292,9 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
             try {
               await unregisterGeofence(`reminder_${id}`);
-              console.log(`[Store] Unregistered geofence for reminder: ${reminder.title}`);
+              if (__DEV__) console.log(`[Store] Unregistered geofence for reminder: ${reminder.title}`);
             } catch (error) {
-              console.warn('[Store] Failed to unregister geofence:', error);
+              if (__DEV__) console.warn('[Store] Failed to unregister geofence:', error);
               // Don't fail the whole operation, just log the warning
             }
           }
@@ -295,9 +306,9 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
           try {
             await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
-            console.log(`[Store] Cancelled scheduled notification for reminder: ${reminder.title}`);
+            if (__DEV__) console.log(`[Store] Cancelled scheduled notification for reminder: ${reminder.title}`);
           } catch (error) {
-            console.warn('[Store] Failed to cancel scheduled notification:', error);
+            if (__DEV__) console.warn('[Store] Failed to cancel scheduled notification:', error);
             // Don't fail the whole operation, just log the warning
           }
         }
@@ -343,9 +354,9 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
             try {
               await unregisterGeofence(`reminder_${reminder.id}`);
-              console.log(`[Store] Unregistered geofence for reminder: ${reminder.title}`);
+              if (__DEV__) console.log(`[Store] Unregistered geofence for reminder: ${reminder.title}`);
             } catch (error) {
-              console.warn('[Store] Failed to unregister geofence:', error);
+              if (__DEV__) console.warn('[Store] Failed to unregister geofence:', error);
             }
           }
         }
@@ -356,9 +367,9 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
           try {
             await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
-            console.log(`[Store] Cancelled scheduled notification for reminder: ${reminder.title}`);
+            if (__DEV__) console.log(`[Store] Cancelled scheduled notification for reminder: ${reminder.title}`);
           } catch (error) {
-            console.warn('[Store] Failed to cancel scheduled notification:', error);
+            if (__DEV__) console.warn('[Store] Failed to cancel scheduled notification:', error);
           }
         }
 
@@ -398,97 +409,99 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
   handleEvent: async (event: SystemEvent) => {
     const { reminders, systemState } = get();
 
-    console.log('=================================================');
-    console.log('[Store] 📥 handleEvent called');
-    console.log('[Store] Event type:', event.type);
-    console.log('[Store] Event timestamp:', new Date(event.timestamp).toISOString());
-    console.log('[Store] Total reminders in store:', reminders.length);
-    console.log('[Store] Reminders by status:', {
-      waiting: reminders.filter(r => r.status === ReminderStatus.WAITING).length,
-      fired: reminders.filter(r => r.status === ReminderStatus.FIRED).length,
-      expired: reminders.filter(r => r.status === ReminderStatus.EXPIRED).length,
-    });
-
-    // For APP_BECAME_ACTIVE (Phone Unlock) events, show extra details
-    if (event.type === SystemEventType.APP_BECAME_ACTIVE) {
-      console.log('[Store] 🔔 APP_BECAME_ACTIVE (Phone Unlock) event details:');
-
-      // Show which reminders have PHONE_UNLOCK triggers
-      const phoneUnlockReminders = reminders.filter(r =>
-        r.triggers.some(t => t.type === TriggerType.PHONE_UNLOCK)
-      );
-      console.log('[Store]   Reminders with PHONE_UNLOCK triggers:', phoneUnlockReminders.length);
-      phoneUnlockReminders.forEach(r => {
-        console.log(`[Store]     - "${r.title}" (id: ${r.id}, status: ${r.status})`);
-
-        // Check activation time for each trigger
-        const phoneUnlockTrigger = r.triggers.find(t => t.type === TriggerType.PHONE_UNLOCK);
-        if (phoneUnlockTrigger?.activationDateTime) {
-          const now = Date.now();
-          const activationTime = phoneUnlockTrigger.activationDateTime;
-          const isActive = now >= activationTime;
-          console.log(`[Store]       Activation time: ${new Date(activationTime).toLocaleString()}`);
-          console.log(`[Store]       Current time: ${new Date(now).toLocaleString()}`);
-          console.log(`[Store]       Is active: ${isActive ? '✅ YES' : '❌ NOT YET (will not fire)'}`);
-        }
+    if (__DEV__) {
+      console.log('=================================================');
+      console.log('[Store] 📥 handleEvent called');
+      console.log('[Store] Event type:', event.type);
+      console.log('[Store] Event timestamp:', new Date(event.timestamp).toISOString());
+      console.log('[Store] Total reminders in store:', reminders.length);
+      console.log('[Store] Reminders by status:', {
+        waiting: reminders.filter(r => r.status === ReminderStatus.WAITING).length,
+        fired: reminders.filter(r => r.status === ReminderStatus.FIRED).length,
+        expired: reminders.filter(r => r.status === ReminderStatus.EXPIRED).length,
       });
+
+      // For APP_BECAME_ACTIVE (Phone Unlock) events, show extra details
+      if (event.type === SystemEventType.APP_BECAME_ACTIVE) {
+        console.log('[Store] 🔔 APP_BECAME_ACTIVE (Phone Unlock) event details:');
+
+        // Show which reminders have PHONE_UNLOCK triggers
+        const phoneUnlockReminders = reminders.filter(r =>
+          r.triggers.some(t => t.type === TriggerType.PHONE_UNLOCK)
+        );
+        console.log('[Store]   Reminders with PHONE_UNLOCK triggers:', phoneUnlockReminders.length);
+        phoneUnlockReminders.forEach(r => {
+          console.log(`[Store]     - "${r.title}" (id: ${r.id}, status: ${r.status})`);
+
+          // Check activation time for each trigger
+          const phoneUnlockTrigger = r.triggers.find(t => t.type === TriggerType.PHONE_UNLOCK);
+          if (phoneUnlockTrigger?.activationDateTime) {
+            const now = Date.now();
+            const activationTime = phoneUnlockTrigger.activationDateTime;
+            const isActive = now >= activationTime;
+            console.log(`[Store]       Activation time: ${new Date(activationTime).toLocaleString()}`);
+            console.log(`[Store]       Current time: ${new Date(now).toLocaleString()}`);
+            console.log(`[Store]       Is active: ${isActive ? '✅ YES' : '❌ NOT YET (will not fire)'}`);
+          }
+        });
+      }
+
+      // For APP_OPENED events, show extra details
+      if (event.type === SystemEventType.APP_OPENED) {
+        const appEvent = event as AppOpenedEvent;
+        console.log('[Store] APP_OPENED event details:');
+        console.log('[Store]   bundleId (activityName):', appEvent.data.bundleId);
+
+        // Show which reminders have APP_OPENED triggers
+        const appOpenedReminders = reminders.filter(r =>
+          r.triggers.some(t => t.type === TriggerType.APP_OPENED)
+        );
+        console.log('[Store]   Reminders with APP_OPENED triggers:', appOpenedReminders.length);
+        appOpenedReminders.forEach(r => {
+          const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
+          const config = appTrigger?.config as { activityName?: string } | undefined;
+          console.log(`[Store]     - "${r.title}" (status: ${r.status}, activityName: ${config?.activityName || 'NOT SET'})`);
+        });
+      }
+
+      // For CHARGING_STATE_CHANGED events, show extra details
+      if (event.type === SystemEventType.CHARGING_STATE_CHANGED) {
+        const chargingEvent = event as any;
+        console.log('[Store] 🔋 CHARGING_STATE_CHANGED event details:');
+        console.log('[Store]   Is charging:', chargingEvent.data.isCharging);
+        console.log('[Store]   Battery level:', chargingEvent.data.level);
+        console.log('[Store]   State:', chargingEvent.data.state);
+
+        // Show which reminders have CHARGING triggers
+        const chargingReminders = reminders.filter(r =>
+          r.triggers.some(t => t.type === TriggerType.CHARGING_STARTED)
+        );
+        console.log('[Store]   Reminders with CHARGING_STARTED triggers:', chargingReminders.length);
+        chargingReminders.forEach(r => {
+          console.log(`[Store]     - "${r.title}" (id: ${r.id}, status: ${r.status})`);
+
+          // Check activation time for each trigger
+          const chargingTrigger = r.triggers.find(t => t.type === TriggerType.CHARGING_STARTED);
+          if (chargingTrigger?.activationDateTime) {
+            const now = Date.now();
+            const activationTime = chargingTrigger.activationDateTime;
+            const isActive = now >= activationTime;
+            console.log(`[Store]       Activation time: ${new Date(activationTime).toLocaleString()}`);
+            console.log(`[Store]       Current time: ${new Date(now).toLocaleString()}`);
+            console.log(`[Store]       Is active: ${isActive ? '✅ YES' : '❌ NOT YET (will not fire)'}`);
+          } else {
+            console.log(`[Store]       No activation time set - will fire immediately`);
+          }
+        });
+      }
+      console.log('=================================================');
     }
-
-    // For APP_OPENED events, show extra details
-    if (event.type === SystemEventType.APP_OPENED) {
-      const appEvent = event as AppOpenedEvent;
-      console.log('[Store] APP_OPENED event details:');
-      console.log('[Store]   bundleId (activityName):', appEvent.data.bundleId);
-
-      // Show which reminders have APP_OPENED triggers
-      const appOpenedReminders = reminders.filter(r =>
-        r.triggers.some(t => t.type === TriggerType.APP_OPENED)
-      );
-      console.log('[Store]   Reminders with APP_OPENED triggers:', appOpenedReminders.length);
-      appOpenedReminders.forEach(r => {
-        const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
-        const config = appTrigger?.config as { activityName?: string } | undefined;
-        console.log(`[Store]     - "${r.title}" (status: ${r.status}, activityName: ${config?.activityName || 'NOT SET'})`);
-      });
-    }
-
-    // For CHARGING_STATE_CHANGED events, show extra details
-    if (event.type === SystemEventType.CHARGING_STATE_CHANGED) {
-      const chargingEvent = event as any;
-      console.log('[Store] 🔋 CHARGING_STATE_CHANGED event details:');
-      console.log('[Store]   Is charging:', chargingEvent.data.isCharging);
-      console.log('[Store]   Battery level:', chargingEvent.data.level);
-      console.log('[Store]   State:', chargingEvent.data.state);
-
-      // Show which reminders have CHARGING triggers
-      const chargingReminders = reminders.filter(r =>
-        r.triggers.some(t => t.type === TriggerType.CHARGING_STARTED)
-      );
-      console.log('[Store]   Reminders with CHARGING_STARTED triggers:', chargingReminders.length);
-      chargingReminders.forEach(r => {
-        console.log(`[Store]     - "${r.title}" (id: ${r.id}, status: ${r.status})`);
-
-        // Check activation time for each trigger
-        const chargingTrigger = r.triggers.find(t => t.type === TriggerType.CHARGING_STARTED);
-        if (chargingTrigger?.activationDateTime) {
-          const now = Date.now();
-          const activationTime = chargingTrigger.activationDateTime;
-          const isActive = now >= activationTime;
-          console.log(`[Store]       Activation time: ${new Date(activationTime).toLocaleString()}`);
-          console.log(`[Store]       Current time: ${new Date(now).toLocaleString()}`);
-          console.log(`[Store]       Is active: ${isActive ? '✅ YES' : '❌ NOT YET (will not fire)'}`);
-        } else {
-          console.log(`[Store]       No activation time set - will fire immediately`);
-        }
-      });
-    }
-    console.log('=================================================');
 
     // Fire notification handler with race condition protection
     const fireNotification = async (reminder: Reminder) => {
       // Check if this reminder is already being processed (prevent double-fire race condition)
       if (processingReminders.has(reminder.id)) {
-        console.warn(`[Store] ⚠️ Reminder ${reminder.id} is already being processed, skipping to prevent duplicate fire`);
+        if (__DEV__) console.warn(`[Store] ⚠️ Reminder ${reminder.id} is already being processed, skipping to prevent duplicate fire`);
         return;
       }
 
@@ -499,9 +512,9 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       );
 
       try {
-        console.log(`[Store] 🔔 Calling notification service for: ${reminder.title}`);
+        if (__DEV__) console.log(`[Store] 🔔 Calling notification service for: ${reminder.title}`);
         await fireNotificationService(reminder);
-        console.log(`[Store] ✅ Notification fired successfully for: ${reminder.title}`);
+        if (__DEV__) console.log(`[Store] ✅ Notification fired successfully for: ${reminder.title}`);
       } catch (error) {
         console.error(`[Store] ❌ Failed to fire notification:`, error);
         throw error;
@@ -513,14 +526,16 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
     // State update handler
     const updateReminderState = async (reminder: Reminder) => {
-      console.log(`[Store] 💾 Updating reminder state for: ${reminder.title}`);
-      console.log(`[Store]   Old status: ${reminder.status}`);
+      if (__DEV__) {
+        console.log(`[Store] 💾 Updating reminder state for: ${reminder.title}`);
+        console.log(`[Store]   Old status: ${reminder.status}`);
+      }
       await get().updateReminder(reminder.id, reminder);
-      console.log(`[Store] ✅ Reminder state updated`);
+      if (__DEV__) console.log(`[Store] ✅ Reminder state updated`);
     };
 
     // Execute rule engine
-    console.log('[Store] 🚀 Calling rule engine (handleSystemEvent)...');
+    if (__DEV__) console.log('[Store] 🚀 Calling rule engine (handleSystemEvent)...');
     await handleSystemEvent(
       event,
       reminders,
@@ -528,7 +543,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       fireNotification,
       updateReminderState
     );
-    console.log('[Store] ✅ Rule engine execution complete');
+    if (__DEV__) console.log('[Store] ✅ Rule engine execution complete');
   },
 
   /**
@@ -543,10 +558,14 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
   /**
    * Update payment entitlements
    */
-  updateEntitlements: (entitlements: PaymentEntitlement) => {
+  updateEntitlements: async (entitlements: PaymentEntitlement) => {
     set({ entitlements });
-    // Save to secure storage (Keychain)
-    // TODO: Implement in Phase 8
+    try {
+      const { saveEntitlementsSecure } = await import('../storage/secureStorage');
+      await saveEntitlementsSecure(entitlements);
+    } catch (error) {
+      console.error('[ReminderStore] Failed to save entitlements to secure storage:', error);
+    }
   },
 
   /**
@@ -582,7 +601,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
         isLoading: false,
       });
 
-      console.log(`[Store] Added saved place: ${place.name}`);
+      if (__DEV__) console.log(`[Store] Added saved place: ${place.name}`);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to add saved place',
@@ -616,7 +635,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
         isLoading: false,
       });
 
-      console.log(`[Store] Updated saved place: ${id}`);
+      if (__DEV__) console.log(`[Store] Updated saved place: ${id}`);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to update saved place',
@@ -648,7 +667,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
         isLoading: false,
       });
 
-      console.log(`[Store] Deleted saved place: ${id}`);
+      if (__DEV__) console.log(`[Store] Deleted saved place: ${id}`);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to delete saved place',
@@ -692,7 +711,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
         savedPlaces: updatedPlaces,
       });
 
-      console.log(`[Store] Incremented usage for saved place: ${id}`);
+      if (__DEV__) console.log(`[Store] Incremented usage for saved place: ${id}`);
     } catch (error) {
       console.error('[Store] Failed to increment place usage:', error);
       // Don't throw - this is a non-critical operation
@@ -739,8 +758,15 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       // Load saved places
       const savedPlaces = await loadAllSavedPlaces();
 
-      // Load payment entitlements
-      const entitlements = await loadEntitlements();
+      // Load payment entitlements from secure storage (Keychain)
+      let entitlements;
+      try {
+        const { loadEntitlementsSecure } = await import('../storage/secureStorage');
+        entitlements = await loadEntitlementsSecure();
+      } catch {
+        // Fallback to database entitlements if secure storage fails
+        entitlements = await loadEntitlements();
+      }
 
       set({
         reminders,
@@ -749,18 +775,20 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
         isLoading: false,
       });
 
-      console.log(`[Store] Loaded ${reminders.length} reminders and ${savedPlaces.length} saved places from storage`);
+      if (__DEV__) {
+        console.log(`[Store] Loaded ${reminders.length} reminders and ${savedPlaces.length} saved places from storage`);
 
-      // Log activation time for each loaded reminder to verify database persistence
-      reminders.forEach(reminder => {
-        console.log(`[Store] 📋 Loaded reminder: "${reminder.title}"`);
-        reminder.triggers.forEach((trigger, index) => {
-          console.log(`[Store]   Trigger ${index + 1}:`);
-          console.log(`[Store]     type: ${trigger.type}`);
-          console.log(`[Store]     activationDateTime (raw): ${trigger.activationDateTime}`);
-          console.log(`[Store]     activationDateTime (readable): ${trigger.activationDateTime ? new Date(trigger.activationDateTime).toLocaleString() : 'NOT SET'}`);
+        // Log activation time for each loaded reminder to verify database persistence
+        reminders.forEach(reminder => {
+          console.log(`[Store] 📋 Loaded reminder: "${reminder.title}"`);
+          reminder.triggers.forEach((trigger, index) => {
+            console.log(`[Store]   Trigger ${index + 1}:`);
+            console.log(`[Store]     type: ${trigger.type}`);
+            console.log(`[Store]     activationDateTime (raw): ${trigger.activationDateTime}`);
+            console.log(`[Store]     activationDateTime (readable): ${trigger.activationDateTime ? new Date(trigger.activationDateTime).toLocaleString() : 'NOT SET'}`);
+          });
         });
-      });
+      }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load data',
@@ -789,7 +817,7 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       // Save entitlements
       await saveEntitlements(entitlements);
 
-      console.log('[Store] Saved to storage successfully');
+      if (__DEV__) console.log('[Store] Saved to storage successfully');
     } catch (error) {
       console.error('[Store] Failed to save:', error);
       throw error;

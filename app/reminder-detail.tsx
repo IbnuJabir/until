@@ -46,14 +46,20 @@ export default function ReminderDetailScreen() {
     // Don't show "not found" error if we're in the process of deleting
     if (isDeleting) return;
 
+    if (!params.id) {
+      router.back();
+      return;
+    }
+
     const found = reminders.find((r) => r.id === params.id);
     if (found) {
       setReminder(found);
     } else {
-      // Reminder not found - maybe it was deleted
-      Alert.alert('Error', 'Reminder not found', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      Alert.alert(
+        'Not Found',
+        'This reminder may have been deleted or is no longer available.',
+        [{ text: 'Go Back', onPress: () => router.back() }]
+      );
     }
   }, [params.id, reminders, isDeleting]);
 

@@ -9,6 +9,7 @@
  */
 
 import * as Notifications from 'expo-notifications';
+import { Linking } from 'react-native';
 import { Reminder } from '../domain';
 
 // Configure notification behavior
@@ -16,11 +17,31 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: true,
+    shouldSetBadge: false,
     shouldShowBanner: true,
     shouldShowList: true,
   }),
 });
+
+/**
+ * Clear notification badge count
+ */
+export async function clearBadgeCount(): Promise<void> {
+  try {
+    await Notifications.setBadgeCountAsync(0);
+  } catch (error) {
+    if (__DEV__) {
+      console.error('[Notifications] Failed to clear badge:', error);
+    }
+  }
+}
+
+/**
+ * Open device notification settings for this app
+ */
+export function openNotificationSettings(): void {
+  Linking.openSettings();
+}
 
 /**
  * Request notification permissions
@@ -37,11 +58,15 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     }
 
     if (finalStatus !== 'granted') {
-      console.warn('[Notifications] Permission denied');
+      if (__DEV__) {
+        console.warn('[Notifications] Permission denied');
+      }
       return false;
     }
 
-    console.log('[Notifications] Permission granted');
+    if (__DEV__) {
+      console.log('[Notifications] Permission granted');
+    }
     return true;
   } catch (error) {
     console.error('[Notifications] Failed to request permissions:', error);

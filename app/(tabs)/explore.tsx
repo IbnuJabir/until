@@ -1,129 +1,182 @@
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Share, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 
+interface SettingsItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
+  color: string;
+  onPress: () => void;
+}
+
 export default function ExploreScreen() {
   const router = useRouter();
-  const { reminders, savedPlaces, entitlements } = useReminderStore();
-  const activeReminders = reminders.filter((r) => r.status === 'waiting');
-  const firedReminders = reminders.filter((r) => r.status === 'fired');
+  const { reminders, loadFromStorage } = useReminderStore();
 
-  const quickActions = [
+  const handleExportData = async () => {
+    try {
+      const data = JSON.stringify(reminders, null, 2);
+      await Share.share({
+        message: data,
+        title: 'Until - My Reminders',
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message !== 'User did not share') {
+        Alert.alert('Export Failed', 'Could not export your data. Please try again.');
+      }
+    }
+  };
+
+  const handleDeleteAllData = () => {
+    Alert.alert(
+      'Delete All Data',
+      'This will permanently delete all your reminders and saved places. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { clearDatabase } = await import('@/app/src/storage/database');
+              await clearDatabase();
+              await loadFromStorage();
+              Alert.alert('Done', 'All data has been deleted.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete data. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handlePrivacyPolicy = () => {
+    Linking.openURL('https://until-app.com/privacy');
+  };
+
+  const handleReportBug = () => {
+    Linking.openURL('mailto:support@until-app.com?subject=Bug Report');
+  };
+
+  const handleRateApp = () => {
+    Alert.alert('Coming Soon', 'App Store rating will be available in a future update.');
+  };
+
+  const handleDatabaseDebug = () => {
+    router.push('/debug-db' as any);
+  };
+
+  const aboutItems: SettingsItem[] = [
     {
-      id: 'voice',
-      title: 'Voice Reminder',
-      description: 'Create a reminder by speaking',
-      icon: 'mic' as keyof typeof MaterialIcons.glyphMap,
-      color: WarmColors.secondary,
-      onPress: () => router.push('/voice-reminder' as any),
-    },
-    {
-      id: 'location',
-      title: 'Saved Places',
-      description: `${savedPlaces.length} location${savedPlaces.length !== 1 ? 's' : ''} saved`,
-      icon: 'location-on' as keyof typeof MaterialIcons.glyphMap,
+      id: 'app-info',
+      title: 'Until',
+      subtitle: 'Version 1.0.0 — Context-aware reminders',
+      icon: 'info-outline',
       color: WarmColors.primary,
-      onPress: () => {
-        // Could navigate to a saved places management screen
-      },
-    },
-    {
-      id: 'stats',
-      title: 'Statistics',
-      description: `${firedReminders.length} completed reminders`,
-      icon: 'bar-chart' as keyof typeof MaterialIcons.glyphMap,
-      color: WarmColors.accent,
-      onPress: () => {
-        // Could navigate to stats screen
-      },
-    },
-    {
-      id: 'debug',
-      title: 'Database Debug',
-      description: 'Export database for inspection',
-      icon: 'bug-report' as keyof typeof MaterialIcons.glyphMap,
-      color: '#FF6B6B',
-      onPress: () => router.push('/debug-db' as any),
+      onPress: () => {},
     },
   ];
+
+  const dataPrivacyItems: SettingsItem[] = [
+    {
+      id: 'export-data',
+      title: 'Export My Data',
+      subtitle: 'Share all reminders as JSON',
+      icon: 'file-download',
+      color: WarmColors.info,
+      onPress: handleExportData,
+    },
+    {
+      id: 'delete-data',
+      title: 'Delete All Data',
+      subtitle: 'Permanently remove all reminders and places',
+      icon: 'delete-forever',
+      color: WarmColors.error,
+      onPress: handleDeleteAllData,
+    },
+    {
+      id: 'privacy-policy',
+      title: 'Privacy Policy',
+      subtitle: 'How we handle your data',
+      icon: 'privacy-tip',
+      color: WarmColors.secondary,
+      onPress: handlePrivacyPolicy,
+    },
+  ];
+
+  const supportItems: SettingsItem[] = [
+    {
+      id: 'report-bug',
+      title: 'Report a Bug',
+      subtitle: 'Send us an email about issues',
+      icon: 'bug-report',
+      color: WarmColors.warning,
+      onPress: handleReportBug,
+    },
+    {
+      id: 'rate-app',
+      title: 'Rate Until',
+      subtitle: 'Leave a review on the App Store',
+      icon: 'star-outline',
+      color: WarmColors.accent,
+      onPress: handleRateApp,
+    },
+  ];
+
+  const debugItems: SettingsItem[] = [
+    {
+      id: 'debug-db',
+      title: 'Database Debug',
+      subtitle: 'Inspect and export database contents',
+      icon: 'storage',
+      color: '#FF6B6B',
+      onPress: handleDatabaseDebug,
+    },
+  ];
+
+  const renderItem = (item: SettingsItem) => (
+    <TouchableOpacity
+      key={item.id}
+      style={styles.actionCard}
+      onPress={item.onPress}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.actionIconContainer, { backgroundColor: `${item.color}15` }]}>
+        <MaterialIcons name={item.icon} size={24} color={item.color} />
+      </View>
+      <View style={styles.actionContent}>
+        <Text style={styles.actionTitle}>{item.title}</Text>
+        <Text style={styles.actionDescription}>{item.subtitle}</Text>
+      </View>
+      <MaterialIcons name="chevron-right" size={24} color={WarmColors.textTertiary} />
+    </TouchableOpacity>
+  );
+
+  const renderSection = (title: string, items: SettingsItem[]) => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {items.map(renderItem)}
+    </View>
+  );
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explore</Text>
-        <Text style={styles.headerSubtitle}>Quick actions and insights</Text>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerSubtitle}>Preferences & privacy</Text>
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: `${WarmColors.primary}15` }]}>
-              <MaterialIcons name="notifications-active" size={24} color={WarmColors.primary} />
-            </View>
-            <Text style={styles.statValue}>{activeReminders.length}</Text>
-            <Text style={styles.statLabel}>Active</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: `${WarmColors.success}15` }]}>
-              <MaterialIcons name="check-circle" size={24} color={WarmColors.success} />
-            </View>
-            <Text style={styles.statValue}>{firedReminders.length}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: `${WarmColors.accent}15` }]}>
-              <MaterialIcons name="location-on" size={24} color={WarmColors.accent} />
-            </View>
-            <Text style={styles.statValue}>{savedPlaces.length}</Text>
-            <Text style={styles.statLabel}>Places</Text>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          {quickActions.map((action) => (
-            <TouchableOpacity
-              key={action.id}
-              style={styles.actionCard}
-              onPress={action.onPress}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.actionIconContainer, { backgroundColor: `${action.color}15` }]}>
-                <MaterialIcons name={action.icon} size={24} color={action.color} />
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>{action.title}</Text>
-                <Text style={styles.actionDescription}>{action.description}</Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={24} color={WarmColors.textTertiary} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Pro Badge */}
-        {!entitlements.hasProAccess && (
-          <TouchableOpacity
-            style={styles.proCard}
-            onPress={() => router.push('/paywall' as any)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.proIconContainer}>
-              <MaterialIcons name="star" size={32} color={WarmColors.accent} />
-            </View>
-            <View style={styles.proContent}>
-              <Text style={styles.proTitle}>Unlock Until Pro</Text>
-              <Text style={styles.proDescription}>
-                Get unlimited reminders and all context triggers
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-forward" size={24} color={WarmColors.textOnPrimary} />
-          </TouchableOpacity>
-        )}
+        {renderSection('About', aboutItems)}
+        {renderSection('Data & Privacy', dataPrivacyItems)}
+        {renderSection('Support', supportItems)}
+        {__DEV__ && renderSection('Debug', debugItems)}
       </ScrollView>
     </View>
   );
@@ -157,36 +210,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: Spacing.md,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: WarmColors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    alignItems: 'center',
-    ...Elevation.level2,
-  },
-  statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-  },
-  statValue: {
-    ...Typography.h3,
-    color: WarmColors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  statLabel: {
-    ...Typography.caption,
-    color: WarmColors.textSecondary,
+    paddingBottom: 100,
   },
   section: {
     marginBottom: Spacing.lg,
@@ -224,30 +248,5 @@ const styles = StyleSheet.create({
   actionDescription: {
     ...Typography.caption,
     color: WarmColors.textSecondary,
-  },
-  proCard: {
-    backgroundColor: WarmColors.primary,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: Spacing.md,
-    ...Elevation.level3,
-  },
-  proIconContainer: {
-    marginRight: Spacing.md,
-  },
-  proContent: {
-    flex: 1,
-  },
-  proTitle: {
-    ...Typography.h4,
-    color: WarmColors.textOnPrimary,
-    marginBottom: Spacing.xs,
-  },
-  proDescription: {
-    ...Typography.caption,
-    color: WarmColors.textOnPrimary,
-    opacity: 0.9,
   },
 });

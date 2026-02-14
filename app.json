@@ -3,6 +3,7 @@
     "name": "until",
     "slug": "until",
     "version": "1.0.0",
+    "description": "Context-aware reminders that fire when the right moment arrives — phone unlock, charging, location, app usage, or a specific time.",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "until",
@@ -14,9 +15,19 @@
       "deploymentTarget": "16.0",
       "infoPlist": {
         "NSSpeechRecognitionUsageDescription": "Allow Until to recognize your speech for voice reminders",
-        "NSMicrophoneUsageDescription": "Allow Until to record your voice for creating reminders"
+        "NSMicrophoneUsageDescription": "Allow Until to record your voice for creating reminders",
+        "NSLocationWhenInUseUsageDescription": "Until needs your location to trigger reminders when you arrive at or leave specific places.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Until needs background location access to trigger reminders when you arrive at specific places, even when the app is closed.",
+        "ITSAppUsesNonExemptEncryption": false
       },
-      "appleTeamId": "8T443QR2WK"
+      "appleTeamId": "8T443QR2WK",
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyCollectedDataTypes": []
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -57,7 +68,8 @@
           "microphonePermission": "Allow Until to record your voice for creating reminders",
           "speechRecognitionPermission": "Allow Until to recognize your speech for voice reminders"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
