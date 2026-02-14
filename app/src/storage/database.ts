@@ -50,6 +50,19 @@ export async function initDatabase(): Promise<void> {
     );
   `);
 
+  // // Migration: Add notification_id column if it doesn't exist
+  // try {
+  //   db.execSync(`
+  //     ALTER TABLE reminders ADD COLUMN notification_id TEXT;
+  //   `);
+  //   console.log('[Database] Added notification_id column to reminders table');
+  // } catch (error: any) {
+  //   // Column already exists or other error - this is expected if migration already ran
+  //   if (!error.message?.includes('duplicate column name')) {
+  //     console.log('[Database] notification_id column already exists or migration skipped');
+  //   }
+  // }
+
   // Create triggers table
   db.execSync(`
     CREATE TABLE IF NOT EXISTS triggers (
