@@ -152,33 +152,39 @@ export function doesTriggerMatchEvent(
 ): boolean {
   return reminder.triggers.some((trigger) => {
     // Log trigger activation time details for debugging
-    console.log(`[RuleEngine] 🕐 Checking trigger activation time for reminder: "${reminder.title}"`);
-    console.log(`[RuleEngine] 🕐 Trigger type: ${trigger.type}`);
-    console.log(`[RuleEngine] 🕐 trigger.activationDateTime value: ${trigger.activationDateTime}`);
-    console.log(`[RuleEngine] 🕐 trigger.activationDateTime (readable): ${trigger.activationDateTime ? new Date(trigger.activationDateTime).toLocaleString() : 'NOT SET'}`);
-    console.log(`[RuleEngine] 🕐 event.timestamp value: ${event.timestamp}`);
-    console.log(`[RuleEngine] 🕐 event.timestamp (readable): ${new Date(event.timestamp).toLocaleString()}`);
+    if (__DEV__) {
+      console.log(`[RuleEngine] 🕐 Checking trigger activation time for reminder: "${reminder.title}"`);
+      console.log(`[RuleEngine] 🕐 Trigger type: ${trigger.type}`);
+      console.log(`[RuleEngine] 🕐 trigger.activationDateTime value: ${trigger.activationDateTime}`);
+      console.log(`[RuleEngine] 🕐 trigger.activationDateTime (readable): ${trigger.activationDateTime ? new Date(trigger.activationDateTime).toLocaleString() : 'NOT SET'}`);
+      console.log(`[RuleEngine] 🕐 event.timestamp value: ${event.timestamp}`);
+      console.log(`[RuleEngine] 🕐 event.timestamp (readable): ${new Date(event.timestamp).toLocaleString()}`);
+    }
 
     // Check if trigger has an activation time and if it's not yet active
     if (trigger.activationDateTime && event.timestamp < trigger.activationDateTime) {
-      console.log(`[RuleEngine] ⏸️ Trigger not yet active. Activation time: ${new Date(trigger.activationDateTime).toLocaleString()}, Current time: ${new Date(event.timestamp).toLocaleString()}`);
+      if (__DEV__) console.log(`[RuleEngine] ⏸️ Trigger not yet active. Activation time: ${new Date(trigger.activationDateTime).toLocaleString()}, Current time: ${new Date(event.timestamp).toLocaleString()}`);
       return false;
     }
 
-    console.log(`[RuleEngine] ✅ Trigger is active (no activation time set OR activation time has passed)`);
+    if (__DEV__) console.log(`[RuleEngine] ✅ Trigger is active (no activation time set OR activation time has passed)`);
 
     switch (event.type) {
       case SystemEventType.APP_BECAME_ACTIVE: {
-        console.log('[RuleEngine] 🔔 Evaluating APP_BECAME_ACTIVE (Phone Unlock) event');
-        console.log('[RuleEngine]   Event timestamp:', new Date(event.timestamp).toISOString());
-        console.log('[RuleEngine]   Trigger type:', trigger.type);
-        console.log('[RuleEngine]   Expected type:', TriggerType.PHONE_UNLOCK);
+        if (__DEV__) {
+          console.log('[RuleEngine] 🔔 Evaluating APP_BECAME_ACTIVE (Phone Unlock) event');
+          console.log('[RuleEngine]   Event timestamp:', new Date(event.timestamp).toISOString());
+          console.log('[RuleEngine]   Trigger type:', trigger.type);
+          console.log('[RuleEngine]   Expected type:', TriggerType.PHONE_UNLOCK);
+        }
 
         const matches = trigger.type === TriggerType.PHONE_UNLOCK;
-        console.log(`[RuleEngine]   Match result: ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
+        if (__DEV__) {
+          console.log(`[RuleEngine]   Match result: ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
 
-        if (matches) {
-          console.log(`[RuleEngine] ✅ PHONE_UNLOCK trigger matched for reminder: ${reminder.id}`);
+          if (matches) {
+            console.log(`[RuleEngine] ✅ PHONE_UNLOCK trigger matched for reminder: ${reminder.id}`);
+          }
         }
 
         return matches;
@@ -197,26 +203,32 @@ export function doesTriggerMatchEvent(
 
       case SystemEventType.APP_OPENED: {
         const appEvent = event as AppOpenedEvent;
-        console.log('[RuleEngine] 📱 Evaluating APP_OPENED event');
-        console.log('[RuleEngine]   Event appId:', appEvent.data.appId);
-        console.log('[RuleEngine]   Event timestamp:', new Date(appEvent.timestamp).toISOString());
+        if (__DEV__) {
+          console.log('[RuleEngine] 📱 Evaluating APP_OPENED event');
+          console.log('[RuleEngine]   Event appId:', appEvent.data.appId);
+          console.log('[RuleEngine]   Event timestamp:', new Date(appEvent.timestamp).toISOString());
+        }
 
         if (trigger.type !== TriggerType.APP_OPENED) {
-          console.log('[RuleEngine]   ❌ Trigger type mismatch:', trigger.type);
+          if (__DEV__) console.log('[RuleEngine]   ❌ Trigger type mismatch:', trigger.type);
           return false;
         }
 
         // PRECISION MATCHING: Match by global app ID
         const config = trigger.config as AppOpenedConfig;
-        console.log('[RuleEngine]   Trigger config appId:', config.appId);
-        console.log('[RuleEngine]   Trigger config displayName:', config.displayName);
+        if (__DEV__) {
+          console.log('[RuleEngine]   Trigger config appId:', config.appId);
+          console.log('[RuleEngine]   Trigger config displayName:', config.displayName);
+        }
 
         const matches = appEvent.data.appId === config.appId;
-        console.log(`[RuleEngine]   Comparing: "${appEvent.data.appId}" === "${config.appId}"`);
-        console.log(`[RuleEngine]   Match result: ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
+        if (__DEV__) {
+          console.log(`[RuleEngine]   Comparing: "${appEvent.data.appId}" === "${config.appId}"`);
+          console.log(`[RuleEngine]   Match result: ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
 
-        if (matches) {
-          console.log(`[RuleEngine] ✅ APP_OPENED trigger matched! App: ${config.displayName} (${config.appId})`);
+          if (matches) {
+            console.log(`[RuleEngine] ✅ APP_OPENED trigger matched! App: ${config.displayName} (${config.appId})`);
+          }
         }
 
         return matches;
@@ -224,19 +236,21 @@ export function doesTriggerMatchEvent(
 
       case SystemEventType.SCHEDULED_TIME_FIRED: {
         const scheduledEvent = event as ScheduledTimeFiredEvent;
-        console.log('[RuleEngine] ⏰ Evaluating SCHEDULED_TIME_FIRED event');
-        console.log('[RuleEngine]   Event reminderId:', scheduledEvent.data.reminderId);
-        console.log('[RuleEngine]   Event timestamp:', new Date(scheduledEvent.timestamp).toISOString());
+        if (__DEV__) {
+          console.log('[RuleEngine] ⏰ Evaluating SCHEDULED_TIME_FIRED event');
+          console.log('[RuleEngine]   Event reminderId:', scheduledEvent.data.reminderId);
+          console.log('[RuleEngine]   Event timestamp:', new Date(scheduledEvent.timestamp).toISOString());
+        }
 
         if (trigger.type !== TriggerType.SCHEDULED_TIME) {
-          console.log('[RuleEngine]   ❌ Trigger type mismatch:', trigger.type);
+          if (__DEV__) console.log('[RuleEngine]   ❌ Trigger type mismatch:', trigger.type);
           return false;
         }
 
         // For SCHEDULED_TIME, we match by reminder ID
         // The scheduled notification was set up for this specific reminder
         const matches = true; // Scheduled time firing means the reminder ID matches
-        console.log(`[RuleEngine] ✅ SCHEDULED_TIME trigger matched for reminder: ${scheduledEvent.data.reminderId}`);
+        if (__DEV__) console.log(`[RuleEngine] ✅ SCHEDULED_TIME trigger matched for reminder: ${scheduledEvent.data.reminderId}`);
 
         return matches;
       }
@@ -259,10 +273,10 @@ export function getRemindersListeningTo(
     const scheduledEvent = event as ScheduledTimeFiredEvent;
     const reminder = reminders.find((r) => r.id === scheduledEvent.data.reminderId);
     if (reminder && reminder.status === ReminderStatus.WAITING) {
-      console.log(`[RuleEngine] Found matching reminder for SCHEDULED_TIME_FIRED: ${reminder.title}`);
+      if (__DEV__) console.log(`[RuleEngine] Found matching reminder for SCHEDULED_TIME_FIRED: ${reminder.title}`);
       return [reminder];
     }
-    console.log(`[RuleEngine] ⚠️ No waiting reminder found for SCHEDULED_TIME_FIRED with ID: ${scheduledEvent.data.reminderId}`);
+    if (__DEV__) console.log(`[RuleEngine] ⚠️ No waiting reminder found for SCHEDULED_TIME_FIRED with ID: ${scheduledEvent.data.reminderId}`);
     return [];
   }
 
@@ -329,57 +343,67 @@ export function evaluateRules(
     currentLocation?: { latitude: number; longitude: number };
   }
 ): RuleEvaluationResult {
-  console.log('[RuleEngine] ========== Evaluating Rules ==========');
-  console.log('[RuleEngine] Event type:', event.type);
-  console.log('[RuleEngine] Total reminders:', allReminders.length);
-  console.log('[RuleEngine] Reminders by status:', {
-    waiting: allReminders.filter(r => r.status === ReminderStatus.WAITING).length,
-    fired: allReminders.filter(r => r.status === ReminderStatus.FIRED).length,
-    expired: allReminders.filter(r => r.status === ReminderStatus.EXPIRED).length,
-  });
+  if (__DEV__) {
+    console.log('[RuleEngine] ========== Evaluating Rules ==========');
+    console.log('[RuleEngine] Event type:', event.type);
+    console.log('[RuleEngine] Total reminders:', allReminders.length);
+    console.log('[RuleEngine] Reminders by status:', {
+      waiting: allReminders.filter(r => r.status === ReminderStatus.WAITING).length,
+      fired: allReminders.filter(r => r.status === ReminderStatus.FIRED).length,
+      expired: allReminders.filter(r => r.status === ReminderStatus.EXPIRED).length,
+    });
+  }
 
   // For APP_OPENED events, show which reminders have APP_OPENED triggers
-  if (event.type === SystemEventType.APP_OPENED) {
-    const appOpenedReminders = allReminders.filter(r =>
-      r.triggers.some(t => t.type === TriggerType.APP_OPENED)
-    );
-    console.log('[RuleEngine] 📱 Reminders with APP_OPENED triggers:', appOpenedReminders.length);
-    appOpenedReminders.forEach(r => {
-      const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
-      const config = appTrigger?.config as AppOpenedConfig | undefined;
-      console.log(`[RuleEngine]   - "${r.title}" (status: ${r.status}, appId: ${config?.appId || 'NOT SET'})`);
-    });
+  if (__DEV__) {
+    if (event.type === SystemEventType.APP_OPENED) {
+      const appOpenedReminders = allReminders.filter(r =>
+        r.triggers.some(t => t.type === TriggerType.APP_OPENED)
+      );
+      console.log('[RuleEngine] 📱 Reminders with APP_OPENED triggers:', appOpenedReminders.length);
+      appOpenedReminders.forEach(r => {
+        const appTrigger = r.triggers.find(t => t.type === TriggerType.APP_OPENED);
+        const config = appTrigger?.config as AppOpenedConfig | undefined;
+        console.log(`[RuleEngine]   - "${r.title}" (status: ${r.status}, appId: ${config?.appId || 'NOT SET'})`);
+      });
+    }
   }
 
   // Step 1: Filter reminders listening to this event
   const listeningReminders = getRemindersListeningTo(allReminders, event);
-  console.log('[RuleEngine] Reminders listening to this event:', listeningReminders.length);
+  if (__DEV__) {
+    console.log('[RuleEngine] Reminders listening to this event:', listeningReminders.length);
 
-  if (listeningReminders.length > 0) {
-    listeningReminders.forEach(r => {
-      console.log(`[RuleEngine] - "${r.title}" (${r.triggers.length} triggers, ${r.conditions.length} conditions)`);
-    });
-  } else {
-    console.log('[RuleEngine] ⚠️ No reminders are listening to this event!');
+    if (listeningReminders.length > 0) {
+      listeningReminders.forEach(r => {
+        console.log(`[RuleEngine] - "${r.title}" (${r.triggers.length} triggers, ${r.conditions.length} conditions)`);
+      });
+    } else {
+      console.log('[RuleEngine] ⚠️ No reminders are listening to this event!');
+    }
   }
 
   // Step 2: Build evaluation context
   const context = buildEvaluationContext(event, currentState);
-  console.log('[RuleEngine] Evaluation context:', {
-    time: context.currentTime.toISOString(),
-    isCharging: context.isCharging,
-    hasLocation: !!context.currentLocation,
-  });
+  if (__DEV__) {
+    console.log('[RuleEngine] Evaluation context:', {
+      time: context.currentTime.toISOString(),
+      isCharging: context.isCharging,
+      hasLocation: !!context.currentLocation,
+    });
+  }
 
   // Step 3: Evaluate conditions for each reminder
   const remindersToFire = listeningReminders.filter((reminder) => {
     const shouldFire = evaluateAllConditions(reminder, context);
-    console.log(`[RuleEngine] "${reminder.title}" - Should fire: ${shouldFire}`);
+    if (__DEV__) console.log(`[RuleEngine] "${reminder.title}" - Should fire: ${shouldFire}`);
     return shouldFire;
   });
 
-  console.log('[RuleEngine] Reminders to fire:', remindersToFire.length);
-  console.log('[RuleEngine] ========================================');
+  if (__DEV__) {
+    console.log('[RuleEngine] Reminders to fire:', remindersToFire.length);
+    console.log('[RuleEngine] ========================================');
+  }
 
   return {
     remindersToFire,
@@ -412,7 +436,7 @@ export async function handleSystemEvent(
   fireNotification: NotificationHandler,
   updateReminderState: StateUpdateHandler
 ): Promise<void> {
-  console.log('[RuleEngine] handleSystemEvent called');
+  if (__DEV__) console.log('[RuleEngine] handleSystemEvent called');
 
   // Evaluate rules
   const { remindersToFire } = evaluateRules(allReminders, event, currentState);
@@ -420,15 +444,15 @@ export async function handleSystemEvent(
   // Fire notifications and update state
   for (const reminder of remindersToFire) {
     try {
-      console.log(`[RuleEngine] Processing reminder: ${reminder.title}`);
+      if (__DEV__) console.log(`[RuleEngine] Processing reminder: ${reminder.title}`);
 
       // For SCHEDULED_TIME_FIRED events, the notification already fired
       // We only need to update the reminder status (prevent duplicate notification)
       if (event.type !== SystemEventType.SCHEDULED_TIME_FIRED) {
-        console.log(`[RuleEngine] Calling fireNotification for event type: ${event.type}`);
+        if (__DEV__) console.log(`[RuleEngine] Calling fireNotification for event type: ${event.type}`);
         await fireNotification(reminder);
       } else {
-        console.log(`[RuleEngine] Skipping fireNotification for SCHEDULED_TIME_FIRED (notification already fired)`);
+        if (__DEV__) console.log(`[RuleEngine] Skipping fireNotification for SCHEDULED_TIME_FIRED (notification already fired)`);
       }
 
       // Mark as fired (fire once guarantee)
@@ -438,9 +462,9 @@ export async function handleSystemEvent(
         firedAt: Date.now(),
       };
 
-      console.log(`[RuleEngine] Updating reminder state to FIRED`);
+      if (__DEV__) console.log(`[RuleEngine] Updating reminder state to FIRED`);
       await updateReminderState(firedReminder);
-      console.log(`[RuleEngine] ✅ Successfully fired and updated: ${reminder.title}`);
+      if (__DEV__) console.log(`[RuleEngine] ✅ Successfully fired and updated: ${reminder.title}`);
     } catch (error) {
       console.error(`[RuleEngine] ❌ Failed to fire reminder ${reminder.id}:`, error);
     }

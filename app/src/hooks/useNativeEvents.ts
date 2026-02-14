@@ -27,11 +27,11 @@ export function useNativeEvents() {
 
   // Load reminders from database on mount - MUST complete before event listeners start
   useEffect(() => {
-    console.log('[useNativeEvents] Loading reminders from database...');
+    if (__DEV__) console.log('[useNativeEvents] Loading reminders from database...');
     loadFromStorage()
       .then(() => {
         setDbLoaded(true);
-        console.log('[useNativeEvents] ✅ Database loaded successfully');
+        if (__DEV__) console.log('[useNativeEvents] ✅ Database loaded successfully');
       })
       .catch((error) => {
         setDbLoaded(true); // Mark as done even on error to prevent hanging
@@ -52,20 +52,20 @@ export function useNativeEvents() {
       );
 
       if (!hasLocationReminders) {
-        console.log('[useNativeEvents] No active location-based reminders to register');
+        if (__DEV__) console.log('[useNativeEvents] No active location-based reminders to register');
         return;
       }
 
       try {
         // Check if LocationModule is available
         if (!NativeModules.LocationModule) {
-          console.warn('[useNativeEvents] LocationModule not available - skipping geofence registration. Make sure iOS project is built.');
+          if (__DEV__) console.warn('[useNativeEvents] LocationModule not available - skipping geofence registration. Make sure iOS project is built.');
           return;
         }
 
         const { registerGeofence } = await import('../native-bridge/LocationBridge');
 
-        console.log('[useNativeEvents] Re-registering geofences for location-based reminders...');
+        if (__DEV__) console.log('[useNativeEvents] Re-registering geofences for location-based reminders...');
 
         let registeredCount = 0;
         for (const reminder of reminders) {
@@ -84,7 +84,7 @@ export function useNativeEvents() {
                   locationConfig.radius
                 );
                 registeredCount++;
-                console.log(`[useNativeEvents] Registered geofence for: ${reminder.title}`);
+                if (__DEV__) console.log(`[useNativeEvents] Registered geofence for: ${reminder.title}`);
               } catch (error) {
                 console.error(`[useNativeEvents] Failed to register geofence for ${reminder.title}:`, error);
               }
@@ -92,7 +92,7 @@ export function useNativeEvents() {
           }
         }
 
-        if (registeredCount > 0) {
+        if (__DEV__ && registeredCount > 0) {
           console.log(`[useNativeEvents] Successfully re-registered ${registeredCount} geofence(s)`);
         }
       } catch (error) {
@@ -106,12 +106,12 @@ export function useNativeEvents() {
   useEffect(() => {
     // Only set up listeners ONCE and ONLY after database is fully loaded
     if (!dbLoaded) {
-      console.log('[useNativeEvents] ⏳ Waiting for database to load...');
+      if (__DEV__) console.log('[useNativeEvents] ⏳ Waiting for database to load...');
       return;
     }
 
     if (listenersSetupRef.current) {
-      console.log('[useNativeEvents] Listeners already set up, skipping...');
+      if (__DEV__) console.log('[useNativeEvents] Listeners already set up, skipping...');
       return;
     }
 
@@ -119,8 +119,10 @@ export function useNativeEvents() {
 
     // Read fresh reminders from store for logging (avoid stale closure)
     const currentReminders = useReminderStore.getState().reminders;
-    console.log('[useNativeEvents] ✅ Database loaded. Setting up native event listeners...');
-    console.log('[useNativeEvents] Current reminders count:', currentReminders.length);
+    if (__DEV__) {
+      console.log('[useNativeEvents] ✅ Database loaded. Setting up native event listeners...');
+      console.log('[useNativeEvents] Current reminders count:', currentReminders.length);
+    }
 
     // Enable battery monitoring on app startup
     enableBatteryMonitoring().catch((error) => {
@@ -130,11 +132,13 @@ export function useNativeEvents() {
     // Subscribe to phone unlock / app became active events
     const unsubscribeAppLifecycle = subscribeToAppBecameActive((event) => {
       const storeReminders = useReminderStore.getState().reminders;
-      console.log('=================================================');
-      console.log('[useNativeEvents] 🔔 APP_BECAME_ACTIVE event received!');
-      console.log('[useNativeEvents] Event timestamp:', new Date(event.timestamp).toISOString());
-      console.log('[useNativeEvents] Active reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
-      console.log('=================================================');
+      if (__DEV__) {
+        console.log('=================================================');
+        console.log('[useNativeEvents] 🔔 APP_BECAME_ACTIVE event received!');
+        console.log('[useNativeEvents] Event timestamp:', new Date(event.timestamp).toISOString());
+        console.log('[useNativeEvents] Active reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
+        console.log('=================================================');
+      }
 
       handleEvent(event).catch((error) => {
         console.error('[useNativeEvents] Error handling event:', error);
@@ -144,12 +148,14 @@ export function useNativeEvents() {
     // Subscribe to charging state changes
     const unsubscribeCharging = subscribeToChargingStateChanges((event) => {
       const storeReminders = useReminderStore.getState().reminders;
-      console.log('=================================================');
-      console.log('[useNativeEvents] 🔋 CHARGING_STATE_CHANGED event received!');
-      console.log('[useNativeEvents] Event timestamp:', new Date(event.timestamp).toISOString());
-      console.log('[useNativeEvents] Is charging:', event.data.isCharging);
-      console.log('[useNativeEvents] Active reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
-      console.log('=================================================');
+      if (__DEV__) {
+        console.log('=================================================');
+        console.log('[useNativeEvents] 🔋 CHARGING_STATE_CHANGED event received!');
+        console.log('[useNativeEvents] Event timestamp:', new Date(event.timestamp).toISOString());
+        console.log('[useNativeEvents] Is charging:', event.data.isCharging);
+        console.log('[useNativeEvents] Active reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
+        console.log('=================================================');
+      }
 
       handleEvent(event).catch((error) => {
         console.error('[useNativeEvents] Error handling charging event:', error);
@@ -159,13 +165,15 @@ export function useNativeEvents() {
     // Subscribe to location region entered events
     const unsubscribeLocation = subscribeToRegionEntered((event) => {
       const storeReminders = useReminderStore.getState().reminders;
-      console.log('=================================================');
-      console.log('[useNativeEvents] 📍 LOCATION_REGION_ENTERED event received!');
-      console.log('[useNativeEvents] Event timestamp:', new Date(event.timestamp).toISOString());
-      console.log('[useNativeEvents] Location:', event.data.latitude, event.data.longitude);
-      console.log('[useNativeEvents] Identifier:', event.data.identifier);
-      console.log('[useNativeEvents] Active reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
-      console.log('=================================================');
+      if (__DEV__) {
+        console.log('=================================================');
+        console.log('[useNativeEvents] 📍 LOCATION_REGION_ENTERED event received!');
+        console.log('[useNativeEvents] Event timestamp:', new Date(event.timestamp).toISOString());
+        console.log('[useNativeEvents] Location:', event.data.latitude, event.data.longitude);
+        console.log('[useNativeEvents] Identifier:', event.data.identifier);
+        console.log('[useNativeEvents] Active reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
+        console.log('=================================================');
+      }
 
       handleEvent(event).catch((error) => {
         console.error('[useNativeEvents] Error handling location event:', error);
@@ -174,42 +182,38 @@ export function useNativeEvents() {
 
     // Poll for app opened events from DeviceActivity extension
     // The extension writes events to App Group storage, which we need to check periodically
-    console.log('[useNativeEvents] Setting up APP_OPENED polling interval...');
-    console.log('[useNativeEvents] ℹ️ NOTE: DeviceActivity extension logs appear in system Console.app, not Metro');
-    console.log('[useNativeEvents] ℹ️ To view extension logs:');
-    console.log('[useNativeEvents] ℹ️   1. Open Console.app on Mac');
-    console.log('[useNativeEvents] ℹ️   2. Filter by "DeviceActivityMonitor"');
-    console.log('[useNativeEvents] ℹ️   3. Watch for 🔥 EVENT THRESHOLD REACHED messages');
+    if (__DEV__) console.log('[useNativeEvents] Setting up APP_OPENED polling interval...');
 
     let pollCount = 0;
     const pollInterval = setInterval(async () => {
       pollCount++;
-      console.log(`[useNativeEvents] 🔍 Polling for app opened events (poll #${pollCount})...`);
+      if (__DEV__) console.log(`[useNativeEvents] 🔍 Polling for app opened events (poll #${pollCount})...`);
 
       try {
         const rawEvent = await checkForAppOpenedEvents();
-        console.log('[useNativeEvents] Poll result:', rawEvent ? 'EVENT FOUND ✅' : 'no event');
+        if (__DEV__) console.log('[useNativeEvents] Poll result:', rawEvent ? 'EVENT FOUND ✅' : 'no event');
 
-        // Log App Group status every 10 polls (30 seconds)
-        if (pollCount % 10 === 0) {
+        // Log App Group status every 10 polls
+        if (__DEV__ && pollCount % 10 === 0) {
           console.log('[useNativeEvents] ℹ️ App Group status check:');
           console.log(`[useNativeEvents]   - Polls completed: ${pollCount}`);
           console.log(`[useNativeEvents]   - Events found: ${pollCount - (pollCount - (lastProcessedEventRef.current ? 1 : 0))}`);
           console.log('[useNativeEvents]   - App Group ID: group.com.ibnuj.until');
-          console.log('[useNativeEvents]   - If no events after app usage, check Console.app for extension logs');
         }
 
         if (rawEvent) {
           // Read fresh reminders from store for validation logging
           const storeReminders = useReminderStore.getState().reminders;
 
-          console.log('=================================================');
-          console.log('[useNativeEvents] 📱 RAW APP_OPENED EVENT DETECTED');
-          console.log('[useNativeEvents] Raw event data:', JSON.stringify(rawEvent, null, 2));
-          console.log('[useNativeEvents] Event timestamp:', new Date(rawEvent.timestamp).toISOString());
-          console.log('[useNativeEvents] App ID (precise identifier):', rawEvent.appId);
-          console.log('[useNativeEvents] Activity name (global monitor):', rawEvent.activityName);
-          console.log('=================================================');
+          if (__DEV__) {
+            console.log('=================================================');
+            console.log('[useNativeEvents] 📱 RAW APP_OPENED EVENT DETECTED');
+            console.log('[useNativeEvents] Raw event data:', JSON.stringify(rawEvent, null, 2));
+            console.log('[useNativeEvents] Event timestamp:', new Date(rawEvent.timestamp).toISOString());
+            console.log('[useNativeEvents] App ID (precise identifier):', rawEvent.appId);
+            console.log('[useNativeEvents] Activity name (global monitor):', rawEvent.activityName);
+            console.log('=================================================');
+          }
 
           // Validate event has required fields
           if (!rawEvent.appId) {
@@ -223,7 +227,7 @@ export function useNativeEvents() {
 
           // Skip if we've already processed this event
           if (lastProcessedEventRef.current === eventId) {
-            console.log('[useNativeEvents] ⏭️  Skipping duplicate event:', eventId);
+            if (__DEV__) console.log('[useNativeEvents] ⏭️  Skipping duplicate event:', eventId);
             return;
           }
 
@@ -238,18 +242,20 @@ export function useNativeEvents() {
             return config?.appId === rawEvent.appId;
           });
 
-          console.log('[useNativeEvents] 🔍 Validation:');
-          console.log('[useNativeEvents]   Total reminders:', storeReminders.length);
-          console.log('[useNativeEvents]   Waiting reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
-          console.log('[useNativeEvents]   Matching reminders for appId:', matchingReminders.length);
+          if (__DEV__) {
+            console.log('[useNativeEvents] 🔍 Validation:');
+            console.log('[useNativeEvents]   Total reminders:', storeReminders.length);
+            console.log('[useNativeEvents]   Waiting reminders:', storeReminders.filter(r => r.status === ReminderStatus.WAITING).length);
+            console.log('[useNativeEvents]   Matching reminders for appId:', matchingReminders.length);
 
-          if (matchingReminders.length > 0) {
-            matchingReminders.forEach(r => {
-              console.log(`[useNativeEvents]   ✅ Found matching reminder: "${r.title}" (id: ${r.id})`);
-            });
-          } else {
-            console.warn('[useNativeEvents]   ⚠️ WARNING: No waiting reminders match this appId!');
-            console.warn('[useNativeEvents]   AppId from event:', rawEvent.appId);
+            if (matchingReminders.length > 0) {
+              matchingReminders.forEach(r => {
+                console.log(`[useNativeEvents]   ✅ Found matching reminder: "${r.title}" (id: ${r.id})`);
+              });
+            } else {
+              console.warn('[useNativeEvents]   ⚠️ WARNING: No waiting reminders match this appId!');
+              console.warn('[useNativeEvents]   AppId from event:', rawEvent.appId);
+            }
           }
 
           // Convert raw event to AppOpenedEvent format
@@ -262,8 +268,10 @@ export function useNativeEvents() {
             },
           };
 
-          console.log('[useNativeEvents] 📤 Dispatching event to handleEvent with appId:', appOpenedEvent.data.appId);
-          console.log('=================================================');
+          if (__DEV__) {
+            console.log('[useNativeEvents] 📤 Dispatching event to handleEvent with appId:', appOpenedEvent.data.appId);
+            console.log('=================================================');
+          }
 
           handleEvent(appOpenedEvent).catch((error) => {
             console.error('[useNativeEvents] ❌ Error handling app opened event:', error);
@@ -273,11 +281,11 @@ export function useNativeEvents() {
         console.error('[useNativeEvents] ❌ Error polling for app opened events:', error);
         console.error('[useNativeEvents] Error details:', JSON.stringify(error, null, 2));
       }
-    }, 3000); // Poll every 3 seconds
+    }, 10000); // Poll every 10 seconds
 
     // Cleanup on unmount
     return () => {
-      console.log('[useNativeEvents] Cleaning up native event listeners...');
+      if (__DEV__) console.log('[useNativeEvents] Cleaning up native event listeners...');
       clearInterval(pollInterval);
       unsubscribeAppLifecycle();
       unsubscribeCharging();
