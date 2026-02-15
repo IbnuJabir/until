@@ -5,17 +5,16 @@
 
 import { create } from 'zustand';
 import {
+  AppOpenedEvent,
+  isReminderActive,
+  markReminderAsFired,
+  PaymentEntitlement,
   Reminder,
   ReminderStatus,
-  PaymentEntitlement,
+  SavedPlace,
   SystemEvent,
   SystemEventType,
-  SavedPlace,
-  TriggerType,
-  AppOpenedEvent,
-  createReminder,
-  markReminderAsFired,
-  isReminderActive,
+  TriggerType
 } from '../domain';
 import { handleSystemEvent } from '../engine/RuleEngine';
 
@@ -779,15 +778,15 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
         console.log(`[Store] Loaded ${reminders.length} reminders and ${savedPlaces.length} saved places from storage`);
 
         // Log activation time for each loaded reminder to verify database persistence
-        reminders.forEach(reminder => {
-          console.log(`[Store] 📋 Loaded reminder: "${reminder.title}"`);
-          reminder.triggers.forEach((trigger, index) => {
-            console.log(`[Store]   Trigger ${index + 1}:`);
-            console.log(`[Store]     type: ${trigger.type}`);
-            console.log(`[Store]     activationDateTime (raw): ${trigger.activationDateTime}`);
-            console.log(`[Store]     activationDateTime (readable): ${trigger.activationDateTime ? new Date(trigger.activationDateTime).toLocaleString() : 'NOT SET'}`);
-          });
-        });
+        // reminders.forEach(reminder => {
+        //   console.log(`[Store] 📋 Loaded reminder: "${reminder.title}"`);
+        //   reminder.triggers.forEach((trigger, index) => {
+        //     console.log(`[Store]   Trigger ${index + 1}:`);
+        //     console.log(`[Store]     type: ${trigger.type}`);
+        //     console.log(`[Store]     activationDateTime (raw): ${trigger.activationDateTime}`);
+        //     console.log(`[Store]     activationDateTime (readable): ${trigger.activationDateTime ? new Date(trigger.activationDateTime).toLocaleString() : 'NOT SET'}`);
+        //   });
+        // });
       }
     } catch (error) {
       set({
