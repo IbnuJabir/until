@@ -12,7 +12,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ibnuj.until",
-      "deploymentTarget": "16.0",
       "infoPlist": {
         "NSSpeechRecognitionUsageDescription": "Allow Until to recognize your speech for voice reminders",
         "NSMicrophoneUsageDescription": "Allow Until to record your voice for creating reminders",
