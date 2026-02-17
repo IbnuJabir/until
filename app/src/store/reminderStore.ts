@@ -589,10 +589,17 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
 
     try {
       const { saveSavedPlace } = await import('../storage/database');
+      const { saveLocationSecure } = await import('../storage/secureStorage');
 
       const currentPlaces = get().savedPlaces;
 
-      // Save to database
+      // Save sensitive coordinates to secure storage (Keychain)
+      await saveLocationSecure(place.id, {
+        latitude: place.latitude,
+        longitude: place.longitude,
+      });
+
+      // Save to database (coordinates also stored for geofence lookups)
       await saveSavedPlace(place);
 
       set({
@@ -654,12 +661,16 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
       const { deleteSavedPlace: dbDeleteSavedPlace } = await import(
         '../storage/database'
       );
+      const { deleteLocationSecure } = await import('../storage/secureStorage');
 
       const currentPlaces = get().savedPlaces;
       const filteredPlaces = currentPlaces.filter((p) => p.id !== id);
 
       // Delete from database
       await dbDeleteSavedPlace(id);
+
+      // Delete coordinates from secure storage
+      await deleteLocationSecure(id);
 
       set({
         savedPlaces: filteredPlaces,

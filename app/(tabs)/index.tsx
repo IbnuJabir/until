@@ -275,6 +275,11 @@ export default function RemindersScreen() {
         windowSize={7}
         maxToRenderPerBatch={10}
         removeClippedSubviews={true}
+        getItemLayout={(_data, index) => ({
+          length: 100,
+          offset: 100 * index,
+          index,
+        })}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

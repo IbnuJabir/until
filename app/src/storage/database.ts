@@ -349,7 +349,7 @@ export async function getReminderById(id: string): Promise<Reminder | null> {
     const triggers: Trigger[] = (triggerRows as any[]).map((triggerRow) => ({
       id: triggerRow.id,
       type: triggerRow.type,
-      config: triggerRow.config ? JSON.parse(triggerRow.config) : null,
+      config: safeJsonParse(triggerRow.config),
       activationDateTime: triggerRow.activation_date_time || undefined,
     }));
 
@@ -363,7 +363,7 @@ export async function getReminderById(id: string): Promise<Reminder | null> {
       (conditionRow) => ({
         id: conditionRow.id,
         type: conditionRow.type,
-        config: JSON.parse(conditionRow.config),
+        config: safeJsonParse(conditionRow.config, {}),
       })
     );
 
@@ -468,6 +468,30 @@ export async function clearDatabase(): Promise<void> {
     db.execSync('ROLLBACK;');
     console.error('[Database] Failed to clear database:', error);
     throw error;
+  }
+}
+
+/**
+ * Prune fired/expired reminders older than the given age (in milliseconds)
+ * Default: prune reminders fired/expired more than 30 days ago
+ */
+export async function pruneFiredReminders(maxAgeMs: number = 30 * 24 * 60 * 60 * 1000): Promise<number> {
+  const db = openDatabase();
+  const cutoff = Date.now() - maxAgeMs;
+
+  try {
+    const result = db.runSync(
+      `DELETE FROM reminders WHERE status IN ('fired', 'expired') AND fired_at IS NOT NULL AND fired_at < ?;`,
+      [cutoff]
+    );
+    const deleted = result.changes;
+    if (__DEV__ && deleted > 0) {
+      console.log(`[Database] Pruned ${deleted} old fired/expired reminders`);
+    }
+    return deleted;
+  } catch (error) {
+    console.error('[Database] Failed to prune fired reminders:', error);
+    return 0;
   }
 }
 

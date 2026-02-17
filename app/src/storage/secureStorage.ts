@@ -62,3 +62,61 @@ export async function clearEntitlementsSecure(): Promise<void> {
     console.error('[SecureStorage] Failed to clear entitlements:', error);
   }
 }
+
+// ============================================================================
+// LOCATION DATA ENCRYPTION
+// ============================================================================
+
+const LOCATION_KEY_PREFIX = 'until_place_';
+
+interface SecureLocationData {
+  latitude: number;
+  longitude: number;
+}
+
+/**
+ * Save location coordinates to secure storage (Keychain)
+ */
+export async function saveLocationSecure(
+  placeId: string,
+  data: SecureLocationData
+): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(
+      `${LOCATION_KEY_PREFIX}${placeId}`,
+      JSON.stringify(data)
+    );
+  } catch (error) {
+    console.error('[SecureStorage] Failed to save location:', error);
+    throw error;
+  }
+}
+
+/**
+ * Load location coordinates from secure storage (Keychain)
+ */
+export async function loadLocationSecure(
+  placeId: string
+): Promise<SecureLocationData | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(
+      `${LOCATION_KEY_PREFIX}${placeId}`
+    );
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error('[SecureStorage] Failed to load location:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete location data from secure storage
+ */
+export async function deleteLocationSecure(placeId: string): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(`${LOCATION_KEY_PREFIX}${placeId}`);
+  } catch (error) {
+    console.error('[SecureStorage] Failed to delete location:', error);
+  }
+}

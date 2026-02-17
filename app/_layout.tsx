@@ -10,8 +10,14 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useNativeEvents } from '@/app/src/hooks/useNativeEvents';
 import { useReminderStore } from '@/app/src/store/reminderStore';
-import { clearBadgeCount } from '@/app/src/utils/NotificationService';
+import {
+  clearBadgeCount,
+  checkPermissionsOnLaunch,
+  setupNotificationCategories,
+  pruneStaleNotifications,
+} from '@/app/src/utils/NotificationService';
 import { initCrashReporter } from '@/app/src/utils/CrashReporter';
+import { initAnalytics, Analytics } from '@/app/src/utils/Analytics';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -26,11 +32,14 @@ export default function RootLayout() {
   // Initialize native event listeners
   useNativeEvents();
 
-  // Initialize crash reporter (production only)
+  // Initialize crash reporter (production only) and analytics
   useEffect(() => {
     if (!__DEV__) {
       initCrashReporter();
     }
+    initAnalytics().then(() => {
+      Analytics.appLaunched();
+    });
   }, []);
 
   // Check if onboarding is complete, redirect if not
@@ -42,13 +51,41 @@ export default function RootLayout() {
     });
   }, []);
 
-  // Clear badge on app launch and when returning to foreground
+  // Set up notification categories, check permissions, clear badge, prune stale notifications
   useEffect(() => {
+    // Set up notification action categories (e.g. "Mark as Done")
+    setupNotificationCategories();
+
+    // Clear badge on launch
     clearBadgeCount();
 
+    // Check notification permissions on cold start (show alert if revoked)
+    checkPermissionsOnLaunch();
+
+    // Prune stale scheduled notifications
+    const store = useReminderStore.getState();
+    const activeIds = store.reminders
+      .filter((r) => r.status === 'waiting')
+      .map((r) => r.id);
+    pruneStaleNotifications(activeIds);
+
+    // Prune old fired/expired reminders from database (older than 30 days)
+    import('@/app/src/storage/database').then(({ pruneFiredReminders }) => {
+      pruneFiredReminders();
+    });
+
+    // Listen to app state changes
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active') {
+        // Clear badge when returning to foreground
         clearBadgeCount();
+        // Re-check notification permissions on resume (in case user revoked in Settings)
+        checkPermissionsOnLaunch();
+      } else if (nextState === 'background') {
+        // Auto-save state when app goes to background
+        useReminderStore.getState().saveToStorage().catch((error) => {
+          console.error('[App] Failed to auto-save on background:', error);
+        });
       }
     });
 
@@ -92,13 +129,28 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Handle notification tap (deep link to reminder detail)
+  // Handle "Mark as Done" notification action
   useEffect(() => {
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
+    const actionSubscription = Notifications.addNotificationResponseReceivedListener(
+      async (response) => {
+        const actionId = response.actionIdentifier;
         const reminderId = response.notification.request.content.data?.reminderId;
 
-        if (reminderId && typeof reminderId === 'string') {
+        if (actionId === 'MARK_DONE' && reminderId && typeof reminderId === 'string') {
+          if (__DEV__) {
+            console.log('[App] Mark as Done action for reminder:', reminderId);
+          }
+          try {
+            const store = useReminderStore.getState();
+            await store.fireReminder(reminderId);
+          } catch (error) {
+            console.error('[App] Failed to mark reminder as done:', error);
+          }
+          return;
+        }
+
+        // Default: navigate to reminder detail on tap
+        if (reminderId && typeof reminderId === 'string' && actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           if (__DEV__) {
             console.log('[App] Notification tapped, navigating to reminder:', reminderId);
           }
@@ -131,7 +183,7 @@ export default function RootLayout() {
     }
 
     return () => {
-      responseSubscription.remove();
+      actionSubscription.remove();
     };
   }, [router]);
 

@@ -1,8 +1,10 @@
+import { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Share, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
+import { setThemePreference, getThemePreference, type ThemePreference } from '@/hooks/use-color-scheme';
 
 interface SettingsItem {
   id: string;
@@ -16,6 +18,16 @@ interface SettingsItem {
 export default function ExploreScreen() {
   const router = useRouter();
   const { reminders, loadFromStorage } = useReminderStore();
+  const [themePref, setThemePref] = useState<ThemePreference>(getThemePreference());
+
+  const handleThemeToggle = () => {
+    const nextTheme: ThemePreference =
+      themePref === 'system' ? 'light' : themePref === 'light' ? 'dark' : 'system';
+    setThemePref(nextTheme);
+    setThemePreference(nextTheme);
+  };
+
+  const themeLabel = themePref === 'system' ? 'System' : themePref === 'light' ? 'Light' : 'Dark';
 
   const handleExportData = async () => {
     try {
@@ -79,6 +91,17 @@ export default function ExploreScreen() {
       icon: 'info-outline',
       color: WarmColors.primary,
       onPress: () => {},
+    },
+  ];
+
+  const appearanceItems: SettingsItem[] = [
+    {
+      id: 'theme',
+      title: 'Appearance',
+      subtitle: `Current: ${themeLabel} — Tap to toggle`,
+      icon: 'brightness-6',
+      color: WarmColors.secondary,
+      onPress: handleThemeToggle,
     },
   ];
 
@@ -174,6 +197,7 @@ export default function ExploreScreen() {
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {renderSection('About', aboutItems)}
+        {renderSection('Appearance', appearanceItems)}
         {renderSection('Data & Privacy', dataPrivacyItems)}
         {renderSection('Support', supportItems)}
         {__DEV__ && renderSection('Debug', debugItems)}
