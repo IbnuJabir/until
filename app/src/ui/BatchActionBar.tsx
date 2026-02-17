@@ -87,8 +87,8 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: WarmColors.error,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs + 2,
-    paddingBottom: Platform.OS === 'ios' ? 24 : Spacing.xs + 2, // Minimal safe area
+    paddingTop: Spacing.xs,
+    paddingBottom: Platform.OS === 'ios' ? 10 : Spacing.xs, // Minimal safe area
     borderTopWidth: 0.5,
     borderTopColor: `${WarmColors.textOnPrimary}15`,
     ...Elevation.level3,
@@ -104,15 +104,17 @@ const styles = StyleSheet.create({
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: .5,
+    paddingVertical: Spacing.xs,
   },
   deleteButtonDisabled: {
     opacity: 0.4,
   },
   deleteButtonText: {
     ...Typography.caption,
+    fontSize: 16,
     color: WarmColors.textOnPrimary,
     fontWeight: '600',
   },
