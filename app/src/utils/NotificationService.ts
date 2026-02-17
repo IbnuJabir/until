@@ -9,21 +9,85 @@
  */
 
 import * as Notifications from 'expo-notifications';
+import { Alert, Linking } from 'react-native';
 import { Reminder } from '../domain';
+
+// Notification category identifier
+const REMINDER_CATEGORY = 'reminder';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: true,
+    shouldSetBadge: false,
     shouldShowBanner: true,
     shouldShowList: true,
   }),
 });
 
 /**
+ * Set up notification categories with action buttons
+ */
+export async function setupNotificationCategories(): Promise<void> {
+  try {
+    await Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY, [
+      {
+        identifier: 'MARK_DONE',
+        buttonTitle: 'Mark as Done',
+        options: { opensAppToForeground: false },
+      },
+    ]);
+    if (__DEV__) {
+      console.log('[Notifications] Notification categories set up');
+    }
+  } catch (error) {
+    if (__DEV__) {
+      console.error('[Notifications] Failed to set up categories:', error);
+    }
+  }
+}
+
+/**
+ * Clear notification badge count
+ */
+export async function clearBadgeCount(): Promise<void> {
+  try {
+    await Notifications.setBadgeCountAsync(0);
+  } catch (error) {
+    if (__DEV__) {
+      console.error('[Notifications] Failed to clear badge:', error);
+    }
+  }
+}
+
+/**
+ * Open device notification settings for this app
+ */
+export function openNotificationSettings(): void {
+  Linking.openSettings();
+}
+
+/**
+ * Show permission denied alert with "Open Settings" CTA
+ */
+function showPermissionDeniedAlert(): void {
+  Alert.alert(
+    'Notifications Disabled',
+    'Until needs notification permissions to deliver your reminders. Please enable them in Settings.',
+    [
+      { text: 'Not Now', style: 'cancel' },
+      {
+        text: 'Open Settings',
+        onPress: () => Linking.openSettings(),
+      },
+    ]
+  );
+}
+
+/**
  * Request notification permissions
+ * Shows an alert with "Open Settings" CTA if permission is denied
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
   try {
@@ -37,11 +101,16 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     }
 
     if (finalStatus !== 'granted') {
-      console.warn('[Notifications] Permission denied');
+      if (__DEV__) {
+        console.warn('[Notifications] Permission denied');
+      }
+      showPermissionDeniedAlert();
       return false;
     }
 
-    console.log('[Notifications] Permission granted');
+    if (__DEV__) {
+      console.log('[Notifications] Permission granted');
+    }
     return true;
   } catch (error) {
     console.error('[Notifications] Failed to request permissions:', error);
@@ -50,7 +119,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
- * Get notification permission status
+ * Check notification permission status (silent - no UI)
  */
 export async function getNotificationPermissionStatus(): Promise<string> {
   try {
@@ -59,6 +128,44 @@ export async function getNotificationPermissionStatus(): Promise<string> {
   } catch (error) {
     console.error('[Notifications] Failed to get permission status:', error);
     return 'undetermined';
+  }
+}
+
+/**
+ * Check permissions on cold start and show alert if revoked
+ */
+export async function checkPermissionsOnLaunch(): Promise<void> {
+  try {
+    const status = await getNotificationPermissionStatus();
+    if (status !== 'granted') {
+      showPermissionDeniedAlert();
+    }
+  } catch (error) {
+    if (__DEV__) {
+      console.error('[Notifications] Failed to check permissions on launch:', error);
+    }
+  }
+}
+
+/**
+ * Prune stale scheduled notifications that no longer have matching reminders
+ */
+export async function pruneStaleNotifications(activeReminderIds: string[]): Promise<void> {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of scheduled) {
+      const reminderId = notification.content.data?.reminderId;
+      if (reminderId && typeof reminderId === 'string' && !activeReminderIds.includes(reminderId)) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+        if (__DEV__) {
+          console.log(`[Notifications] Pruned stale notification for reminder: ${reminderId}`);
+        }
+      }
+    }
+  } catch (error) {
+    if (__DEV__) {
+      console.error('[Notifications] Failed to prune stale notifications:', error);
+    }
   }
 }
 
@@ -95,6 +202,7 @@ export async function scheduleNotificationAtTime(
         priority: Notifications.AndroidNotificationPriority.HIGH,
         // iOS 15+ time-sensitive notifications
         interruptionLevel: 'timeSensitive' as any,
+        categoryIdentifier: REMINDER_CATEGORY,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -102,7 +210,9 @@ export async function scheduleNotificationAtTime(
       } as Notifications.DateTriggerInput,
     });
 
-    console.log(`[Notifications] Scheduled notification ${notificationId} for reminder: ${reminder.title} at ${new Date(scheduledDateTime).toISOString()}`);
+    if (__DEV__) {
+      console.log(`[Notifications] Scheduled notification ${notificationId} for reminder: ${reminder.title} at ${new Date(scheduledDateTime).toISOString()}`);
+    }
 
     return notificationId;
   } catch (error) {
@@ -113,8 +223,9 @@ export async function scheduleNotificationAtTime(
 
 /**
  * Fire a local notification for a reminder (immediately)
+ * Includes retry logic for transient failures
  */
-export async function fireNotification(reminder: Reminder): Promise<string> {
+export async function fireNotification(reminder: Reminder, retries = 2): Promise<string> {
   try {
     // Check permission first
     const hasPermission = await requestNotificationPermissions();
@@ -135,17 +246,27 @@ export async function fireNotification(reminder: Reminder): Promise<string> {
         sound: true,
         priority: Notifications.AndroidNotificationPriority.HIGH,
         // iOS 15+ time-sensitive notifications (like Calendar/Reminders apps)
-        // This makes the notification more prominent with louder sound and longer display
-        interruptionLevel: 'timeSensitive' as any, // Type not exported but supported by expo-notifications
+        interruptionLevel: 'timeSensitive' as any,
+        categoryIdentifier: REMINDER_CATEGORY,
       },
       trigger: null, // Fire immediately
     });
 
-    console.log(`[Notifications] Fired notification ${notificationId} for reminder: ${reminder.title}`);
+    if (__DEV__) {
+      console.log(`[Notifications] Fired notification ${notificationId} for reminder: ${reminder.title}`);
+    }
 
     return notificationId;
   } catch (error) {
-    console.error('[Notifications] Failed to fire notification:', error);
+    if (retries > 0) {
+      if (__DEV__) {
+        console.warn(`[Notifications] Retrying notification for ${reminder.title} (${retries} retries left)`);
+      }
+      // Wait briefly before retry
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return fireNotification(reminder, retries - 1);
+    }
+    console.error('[Notifications] Failed to fire notification after retries:', error);
     throw error;
   }
 }
@@ -156,7 +277,9 @@ export async function fireNotification(reminder: Reminder): Promise<string> {
 export async function cancelNotification(notificationId: string): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
-    console.log(`[Notifications] Cancelled notification: ${notificationId}`);
+    if (__DEV__) {
+      console.log(`[Notifications] Cancelled notification: ${notificationId}`);
+    }
   } catch (error) {
     console.error('[Notifications] Failed to cancel notification:', error);
     throw error;
@@ -169,7 +292,9 @@ export async function cancelNotification(notificationId: string): Promise<void> 
 export async function cancelAllNotifications(): Promise<void> {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log('[Notifications] Cancelled all notifications');
+    if (__DEV__) {
+      console.log('[Notifications] Cancelled all notifications');
+    }
   } catch (error) {
     console.error('[Notifications] Failed to cancel all notifications:', error);
     throw error;

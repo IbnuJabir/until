@@ -79,6 +79,14 @@ export default function VoiceReminderScreen() {
 
   const startListening = async () => {
     try {
+      // Check network connectivity (speech recognition requires network)
+      const { checkNetworkConnectivity } = await import('@/app/src/utils/NetworkUtils');
+      const isOnline = await checkNetworkConnectivity();
+      if (!isOnline) {
+        setError('No internet connection. Voice reminders require network access for speech recognition.');
+        return;
+      }
+
       // Check if speech recognition is supported
       const androidRecognitionAvailable = await ExpoSpeechRecognitionModule.androidRecognitionAvailable?.();
       const iosRecognitionAvailable = await ExpoSpeechRecognitionModule.iosRecognitionAvailable?.();
@@ -306,6 +314,9 @@ export default function VoiceReminderScreen() {
         {error && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={() => setError(null)} style={styles.errorDismiss}>
+              <MaterialIcons name="close" size={18} color={WarmColors.error} />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -468,6 +479,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+  },
+  errorDismiss: {
+    marginLeft: 'auto' as const,
+    padding: 4,
   },
   errorText: {
     ...Typography.caption,

@@ -22,6 +22,22 @@ export interface GlobalApp {
 }
 
 const DATABASE_NAME = 'until.db';
+const SCHEMA_VERSION = 1;
+
+/**
+ * Safely parse JSON with fallback
+ */
+function safeJsonParse(json: string | null, fallback: any = null): any {
+  if (!json) return fallback;
+  try {
+    return JSON.parse(json);
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[Database] Failed to parse JSON:', json, error);
+    }
+    return fallback;
+  }
+}
 
 /**
  * Get database connection
@@ -49,6 +65,19 @@ export async function initDatabase(): Promise<void> {
       notification_id TEXT
     );
   `);
+
+  // // Migration: Add notification_id column if it doesn't exist
+  // try {
+  //   db.execSync(`
+  //     ALTER TABLE reminders ADD COLUMN notification_id TEXT;
+  //   `);
+  //   console.log('[Database] Added notification_id column to reminders table');
+  // } catch (error: any) {
+  //   // Column already exists or other error - this is expected if migration already ran
+  //   if (!error.message?.includes('duplicate column name')) {
+  //     console.log('[Database] notification_id column already exists or migration skipped');
+  //   }
+  // }
 
   // Create triggers table
   db.execSync(`
@@ -135,7 +164,20 @@ export async function initDatabase(): Promise<void> {
     ON saved_places(created_at DESC);
   `);
 
-  console.log('[Database] Initialized successfully');
+  // Schema version tracking
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS schema_version (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      version INTEGER NOT NULL
+    );
+  `);
+  db.execSync(`
+    INSERT OR IGNORE INTO schema_version (id, version) VALUES (1, ${SCHEMA_VERSION});
+  `);
+
+  if (__DEV__) {
+    console.log('[Database] Initialized successfully');
+  }
 }
 
 /**
@@ -226,7 +268,7 @@ export async function loadAllReminders(): Promise<Reminder[]> {
       const triggers: Trigger[] = (triggerRows as any[]).map((triggerRow) => ({
         id: triggerRow.id,
         type: triggerRow.type,
-        config: triggerRow.config ? JSON.parse(triggerRow.config) : null,
+        config: safeJsonParse(triggerRow.config),
         activationDateTime: triggerRow.activation_date_time || undefined,
       }));
 
@@ -240,7 +282,7 @@ export async function loadAllReminders(): Promise<Reminder[]> {
         (conditionRow) => ({
           id: conditionRow.id,
           type: conditionRow.type,
-          config: JSON.parse(conditionRow.config),
+          config: safeJsonParse(conditionRow.config, {}),
         })
       );
 
@@ -276,7 +318,7 @@ export async function deleteReminder(id: string): Promise<void> {
 
   try {
     db.runSync('DELETE FROM reminders WHERE id = ?;', [id]);
-    console.log(`[Database] Deleted reminder: ${id}`);
+    if (__DEV__) console.log(`[Database] Deleted reminder: ${id}`);
   } catch (error) {
     console.error('[Database] Failed to delete reminder:', error);
     throw error;
@@ -307,7 +349,7 @@ export async function getReminderById(id: string): Promise<Reminder | null> {
     const triggers: Trigger[] = (triggerRows as any[]).map((triggerRow) => ({
       id: triggerRow.id,
       type: triggerRow.type,
-      config: triggerRow.config ? JSON.parse(triggerRow.config) : null,
+      config: safeJsonParse(triggerRow.config),
       activationDateTime: triggerRow.activation_date_time || undefined,
     }));
 
@@ -321,7 +363,7 @@ export async function getReminderById(id: string): Promise<Reminder | null> {
       (conditionRow) => ({
         id: conditionRow.id,
         type: conditionRow.type,
-        config: JSON.parse(conditionRow.config),
+        config: safeJsonParse(conditionRow.config, {}),
       })
     );
 
@@ -368,7 +410,7 @@ export async function saveEntitlements(
         entitlements.expiryDate || null,
       ]
     );
-    console.log('[Database] Saved entitlements');
+    if (__DEV__) console.log('[Database] Saved entitlements');
   } catch (error) {
     console.error('[Database] Failed to save entitlements:', error);
     throw error;
@@ -421,11 +463,35 @@ export async function clearDatabase(): Promise<void> {
     db.execSync('DELETE FROM saved_places;');
     db.execSync('UPDATE entitlements SET has_pro_access = 0, subscription_active = 0 WHERE id = 1;');
     db.execSync('COMMIT;');
-    console.log('[Database] Cleared all data');
+    if (__DEV__) console.log('[Database] Cleared all data');
   } catch (error) {
     db.execSync('ROLLBACK;');
     console.error('[Database] Failed to clear database:', error);
     throw error;
+  }
+}
+
+/**
+ * Prune fired/expired reminders older than the given age (in milliseconds)
+ * Default: prune reminders fired/expired more than 30 days ago
+ */
+export async function pruneFiredReminders(maxAgeMs: number = 30 * 24 * 60 * 60 * 1000): Promise<number> {
+  const db = openDatabase();
+  const cutoff = Date.now() - maxAgeMs;
+
+  try {
+    const result = db.runSync(
+      `DELETE FROM reminders WHERE status IN ('fired', 'expired') AND fired_at IS NOT NULL AND fired_at < ?;`,
+      [cutoff]
+    );
+    const deleted = result.changes;
+    if (__DEV__ && deleted > 0) {
+      console.log(`[Database] Pruned ${deleted} old fired/expired reminders`);
+    }
+    return deleted;
+  } catch (error) {
+    console.error('[Database] Failed to prune fired reminders:', error);
+    return 0;
   }
 }
 
@@ -457,7 +523,7 @@ export async function saveSavedPlace(place: SavedPlace): Promise<void> {
     ]
   );
 
-  console.log(`[Database] Saved place: ${place.name}`);
+  if (__DEV__) console.log(`[Database] Saved place: ${place.name}`);
 }
 
 /**
@@ -483,7 +549,7 @@ export async function loadAllSavedPlaces(): Promise<SavedPlace[]> {
     usageCount: row.usage_count,
   }));
 
-  console.log(`[Database] Loaded ${places.length} saved places`);
+  if (__DEV__) console.log(`[Database] Loaded ${places.length} saved places`);
   return places;
 }
 
@@ -571,7 +637,7 @@ export async function updateSavedPlace(
   const sql = `UPDATE saved_places SET ${fields.join(', ')} WHERE id = ?`;
   db.runSync(sql, values);
 
-  console.log(`[Database] Updated saved place: ${id}`);
+  if (__DEV__) console.log(`[Database] Updated saved place: ${id}`);
 }
 
 /**
@@ -582,7 +648,7 @@ export async function deleteSavedPlace(id: string): Promise<void> {
 
   db.runSync('DELETE FROM saved_places WHERE id = ?', [id]);
 
-  console.log(`[Database] Deleted saved place: ${id}`);
+  if (__DEV__) console.log(`[Database] Deleted saved place: ${id}`);
 }
 
 /**
@@ -596,7 +662,7 @@ export async function incrementPlaceUsage(id: string): Promise<void> {
     [Date.now(), id]
   );
 
-  console.log(`[Database] Incremented usage count for place: ${id}`);
+  if (__DEV__) console.log(`[Database] Incremented usage count for place: ${id}`);
 }
 
 // ============================================================================
@@ -616,7 +682,7 @@ export async function saveGlobalApp(app: GlobalApp): Promise<void> {
     [app.id, app.displayName, app.addedAt, app.usageCount]
   );
 
-  console.log(`[Database] Saved global app: ${app.displayName}`);
+  if (__DEV__) console.log(`[Database] Saved global app: ${app.displayName}`);
 }
 
 /**
@@ -636,7 +702,7 @@ export async function loadAllGlobalApps(): Promise<GlobalApp[]> {
     usageCount: row.usage_count,
   }));
 
-  console.log(`[Database] Loaded ${apps.length} global apps`);
+  if (__DEV__) console.log(`[Database] Loaded ${apps.length} global apps`);
   return apps;
 }
 
@@ -677,7 +743,7 @@ export async function updateGlobalAppName(
     id,
   ]);
 
-  console.log(`[Database] Updated global app name: ${id}`);
+  if (__DEV__) console.log(`[Database] Updated global app name: ${id}`);
 }
 
 /**
@@ -688,7 +754,7 @@ export async function deleteGlobalApp(id: string): Promise<void> {
 
   db.runSync('DELETE FROM global_apps WHERE id = ?', [id]);
 
-  console.log(`[Database] Deleted global app: ${id}`);
+  if (__DEV__) console.log(`[Database] Deleted global app: ${id}`);
 }
 
 /**
@@ -702,5 +768,5 @@ export async function incrementGlobalAppUsage(id: string): Promise<void> {
     [id]
   );
 
-  console.log(`[Database] Incremented usage count for global app: ${id}`);
+  if (__DEV__) console.log(`[Database] Incremented usage count for global app: ${id}`);
 }
