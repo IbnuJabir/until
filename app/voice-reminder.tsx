@@ -268,10 +268,15 @@ export default function VoiceReminderScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <MaterialIcons name="arrow-back" size={24} color={WarmColors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Voice Reminder</Text>
+        <Text style={styles.headerTitle} allowFontScaling={false}>Voice Reminder</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -297,6 +302,9 @@ export default function VoiceReminderScreen() {
               onPress={isListening ? stopListening : startListening}
               disabled={isCreating}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={isListening ? 'Stop voice recording' : 'Start voice recording'}
+              accessibilityState={{ disabled: isCreating }}
             >
               <MaterialIcons 
                 name={isListening ? 'mic' : 'mic-none'} 
@@ -314,7 +322,12 @@ export default function VoiceReminderScreen() {
         {error && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={() => setError(null)} style={styles.errorDismiss}>
+            <TouchableOpacity
+              onPress={() => setError(null)}
+              style={styles.errorDismiss}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss error"
+            >
               <MaterialIcons name="close" size={18} color={WarmColors.error} />
             </TouchableOpacity>
           </View>
@@ -366,6 +379,9 @@ export default function VoiceReminderScreen() {
               onPress={createReminderFromVoice}
               disabled={isCreating || parsedReminder.triggers.length === 0}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={isCreating ? 'Creating reminder' : 'Create reminder from voice'}
+              accessibilityState={{ disabled: isCreating || parsedReminder.triggers.length === 0 }}
             >
               {isCreating ? (
                 <ActivityIndicator color={WarmColors.textOnPrimary} />

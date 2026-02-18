@@ -689,10 +689,15 @@ export default function CreateReminderScreen() {
         style={styles.container}
       >
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.cancelButton}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.cancelButton}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel, go back"
+          >
             <MaterialIcons name="close" size={24} color={WarmColors.textSecondary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>New Reminder</Text>
+          <Text style={styles.headerTitle} allowFontScaling={false}>New Reminder</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -759,6 +764,9 @@ export default function CreateReminderScreen() {
                       onPress={() => toggleTrigger(option.type, option.isPro)}
                       activeOpacity={0.7}
                       disabled={screenTime.isLoading || isAppTriggerUnavailable}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={`${option.label}${isLocked ? ', Pro feature' : ''}${isAppTriggerUnavailable ? ', not available' : ''}`}
+                      accessibilityState={{ checked: isSelected, disabled: screenTime.isLoading || isAppTriggerUnavailable }}
                     >
                       <View style={styles.triggerLeft}>
                         <View style={[styles.triggerIconContainer, isSelected && styles.triggerIconContainerSelected]}>
@@ -932,14 +940,17 @@ export default function CreateReminderScreen() {
             onPress={handleCreate}
             disabled={isCreating}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={isCreating ? 'Creating reminder, please wait' : 'Create reminder'}
+            accessibilityState={{ disabled: isCreating }}
           >
             {isCreating ? (
               <>
                 <ActivityIndicator color={WarmColors.textOnPrimary} size="small" />
-                <Text style={styles.createButtonText}>Creating...</Text>
+                <Text style={styles.createButtonText} allowFontScaling={false}>Creating...</Text>
               </>
             ) : (
-              <Text style={styles.createButtonText}>Create Reminder</Text>
+              <Text style={styles.createButtonText} allowFontScaling={false}>Create Reminder</Text>
             )}
           </TouchableOpacity>
         </View>

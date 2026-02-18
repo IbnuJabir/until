@@ -65,6 +65,10 @@ export function SwipeableReminderCard({
     }
   };
 
+  const cardAccessibilityLabel = isSelectionMode
+    ? `${item.title}, ${isSelected ? 'selected' : 'not selected'}, double tap to ${isSelected ? 'deselect' : 'select'}`
+    : `${item.title}, ${isFired ? 'completed' : 'active'} reminder, double tap to view details`;
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -76,6 +80,9 @@ export function SwipeableReminderCard({
         onPress={handlePress}
         onLongPress={onDelete}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={cardAccessibilityLabel}
+        accessibilityState={{ selected: isSelected }}
       >
         <View style={styles.reminderContent}>
           {/* Selection Checkbox */}
