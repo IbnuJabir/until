@@ -69,9 +69,10 @@ export default function RootLayout() {
       .map((r) => r.id);
     pruneStaleNotifications(activeIds);
 
-    // Prune old fired/expired reminders from database (older than 30 days)
-    import('@/app/src/storage/database').then(({ pruneFiredReminders }) => {
+    // Prune old fired/expired reminders and unused saved places from database
+    import('@/app/src/storage/database').then(({ pruneFiredReminders, pruneUnusedSavedPlaces }) => {
       pruneFiredReminders();
+      pruneUnusedSavedPlaces();
     });
 
     // Listen to app state changes
