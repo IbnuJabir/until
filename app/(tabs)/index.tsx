@@ -257,7 +257,7 @@ export default function RemindersScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Select reminders"
                 >
-                  <MaterialIcons name="check-circle-outline" size={20} color={WarmColors.primary} />
+                  <MaterialIcons name="check-circle-outline" size={16} color={WarmColors.primary} />
                   <Text style={styles.selectButtonText} allowFontScaling={false}>Select</Text>
                 </TouchableOpacity>
               )}
@@ -268,7 +268,7 @@ export default function RemindersScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Create voice reminder"
               >
-                <MaterialIcons name="mic" size={20} color={WarmColors.textOnPrimary} />
+                <MaterialIcons name="mic" size={16} color={WarmColors.textOnPrimary} />
               </TouchableOpacity>
             </>
           )}
@@ -393,8 +393,8 @@ const styles = StyleSheet.create({
   },
   voiceButton: {
     backgroundColor: WarmColors.secondary,
-    width: 44,
-    height: 44,
+    width: 34,
+    height: 34,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -578,14 +578,14 @@ const styles = StyleSheet.create({
   selectButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
     borderRadius: BorderRadius.md,
     backgroundColor: `${WarmColors.primary}15`,
   },
   selectButtonText: {
-    ...Typography.caption,
+    ...Typography.small,
     color: WarmColors.primary,
     fontWeight: '600',
   },
