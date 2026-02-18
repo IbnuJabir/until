@@ -52,7 +52,7 @@ export default function VoiceReminderScreen() {
         setParsedReminder(parsed);
         setError(null);
       } catch (err) {
-        console.error('[VoiceReminder] Parse error:', err);
+        if (__DEV__) console.error('[VoiceReminder] Parse error:', err);
         setError('Could not understand that. Please try again.');
       }
     }
@@ -60,13 +60,20 @@ export default function VoiceReminderScreen() {
 
   // Listen for errors
   useSpeechRecognitionEvent('error', (event) => {
-    console.error('[VoiceReminder] Speech recognition error:', event.error);
+    if (__DEV__) console.warn('[VoiceReminder] Speech recognition error:', event.error);
     setIsListening(false);
+    pulseAnim.stopAnimation();
+    pulseAnim.setValue(1);
 
+    // 'no-speech' is very common (silence / background noise) — keep any existing
+    // transcript/draft intact and show a soft, non-blocking message
     if (event.error === 'no-speech') {
-      setError('No speech detected. Please try again.');
-    } else if (event.error === 'audio') {
+      // Only show the hint if the user hasn't already captured something
+      setError('No speech detected — tap the mic and speak clearly.');
+    } else if (event.error === 'audio-capture') {
       setError('Microphone error. Please check permissions.');
+    } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      setError('Microphone permission denied. Please enable it in Settings.');
     } else {
       setError('Speech recognition error. Please try again.');
     }
@@ -75,10 +82,26 @@ export default function VoiceReminderScreen() {
   // Listen for end of speech
   useSpeechRecognitionEvent('end', () => {
     setIsListening(false);
+    pulseAnim.stopAnimation();
+    pulseAnim.setValue(1);
   });
 
   const startListening = async () => {
+    // Reset all state immediately before any async work so UI is clean
+    setTranscript('');
+    setParsedReminder(null);
+    setError(null);
+    pulseAnim.stopAnimation();
+    pulseAnim.setValue(1);
+
     try {
+      // Always stop any previous session first to avoid "already running" errors
+      try {
+        await ExpoSpeechRecognitionModule.stop();
+      } catch {
+        // Ignore — it may not have been running
+      }
+
       // Check network connectivity (speech recognition requires network)
       const { checkNetworkConnectivity } = await import('@/app/src/utils/NetworkUtils');
       const isOnline = await checkNetworkConnectivity();
@@ -87,11 +110,8 @@ export default function VoiceReminderScreen() {
         return;
       }
 
-      // Check if speech recognition is supported
-      const androidRecognitionAvailable = await ExpoSpeechRecognitionModule.androidRecognitionAvailable?.();
-      const iosRecognitionAvailable = await ExpoSpeechRecognitionModule.iosRecognitionAvailable?.();
-
-      console.log('[VoiceReminder] Recognition available:', { androidRecognitionAvailable, iosRecognitionAvailable });
+      // These debug checks are removed as the methods don't exist on ExpoSpeechRecognitionModule
+      // The module will handle platform-specific availability checks internally
 
       // Start speech recognition (permissions will be requested automatically)
       await ExpoSpeechRecognitionModule.start({
@@ -103,10 +123,7 @@ export default function VoiceReminderScreen() {
       });
 
       setIsListening(true);
-      setTranscript('');
-      setParsedReminder(null);
-      setError(null);
-      
+
       // Start pulse animation
       Animated.loop(
         Animated.sequence([
@@ -123,7 +140,8 @@ export default function VoiceReminderScreen() {
         ])
       ).start();
     } catch (err: any) {
-      console.error('[VoiceReminder] Failed to start speech recognition:', err);
+      if (__DEV__) console.error('[VoiceReminder] Failed to start speech recognition:', err);
+      setIsListening(false);
 
       // Handle permission errors
       if (err.message?.includes('permission') || err.message?.includes('denied')) {
@@ -145,7 +163,7 @@ export default function VoiceReminderScreen() {
       pulseAnim.stopAnimation();
       pulseAnim.setValue(1);
     } catch (err) {
-      console.error('[VoiceReminder] Failed to stop speech recognition:', err);
+      if (__DEV__) console.error('[VoiceReminder] Failed to stop speech recognition:', err);
     }
   };
 
@@ -174,7 +192,7 @@ export default function VoiceReminderScreen() {
     }
 
     // Location not found - create placeholder that user can edit later
-    console.log(`[VoiceReminder] Location "${trigger.locationQuery}" not found, creating placeholder`);
+    if (__DEV__) console.log(`[VoiceReminder] Location "${trigger.locationQuery}" not found, creating placeholder`);
     return createTrigger(
       TriggerType.LOCATION_ENTER,
       {
@@ -210,13 +228,13 @@ export default function VoiceReminderScreen() {
           }
         } else if (parsedTrigger.type === TriggerType.APP_OPENED) {
           // Create placeholder app trigger - user can select actual app later
-          console.log(`[VoiceReminder] Creating placeholder app trigger for "${parsedTrigger.appQuery}"`);
+          if (__DEV__) console.log(`[VoiceReminder] Creating placeholder app trigger for "${parsedTrigger.appQuery}"`);
           triggers.push(
             createTrigger(
               TriggerType.APP_OPENED,
               {
-                bundleId: 'unknown',
-                appName: `${parsedTrigger.appQuery || 'Unknown App'} (Select app)`,
+                appId: 'unknown',
+                displayName: `${parsedTrigger.appQuery || 'Unknown App'} (Select app)`,
               },
               parsedTrigger.activationDateTime
             )
@@ -257,7 +275,7 @@ export default function VoiceReminderScreen() {
       router.dismissAll();
       router.replace('/(tabs)?message=Voice reminder created!' as any);
     } catch (err) {
-      console.error('[VoiceReminder] Failed to create reminder:', err);
+      if (__DEV__) console.error('[VoiceReminder] Failed to create reminder:', err);
       Alert.alert('Error', 'Failed to create reminder. Please try again.');
     } finally {
       setIsCreating(false);
