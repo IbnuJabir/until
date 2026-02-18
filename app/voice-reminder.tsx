@@ -40,6 +40,16 @@ export default function VoiceReminderScreen() {
   const [error, setError] = useState<string | null>(null);
   const [pulseAnim] = useState(new Animated.Value(1));
 
+  // Reset all voice state on mount so returning to this screen starts fresh
+  useEffect(() => {
+    setTranscript('');
+    setParsedReminder(null);
+    setError(null);
+    setIsListening(false);
+    pulseAnim.stopAnimation();
+    pulseAnim.setValue(1);
+  }, []);
+
   // Listen for speech recognition results
   useSpeechRecognitionEvent('result', (event) => {
     const text = event.results[0]?.transcript || '';
