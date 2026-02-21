@@ -18,7 +18,7 @@ interface ToastProps {
 export const Toast: React.FC<ToastProps> = ({
   message,
   visible,
-  duration = 2000,
+  duration = 4000,
   onHide,
 }) => {
   const [fadeAnim] = useState(new Animated.Value(0));

@@ -6,17 +6,21 @@
 import { NativeEventEmitter, NativeModules } from 'react-native';
 import { AppOpenedEvent, SystemEventType } from '../domain';
 
-console.log('[ScreenTimeBridge] Initializing...');
+if (__DEV__) console.log('[ScreenTimeBridge] Initializing...');
 
 const { ScreenTimeModule } = NativeModules;
 
 if (!ScreenTimeModule) {
-  console.error('[ScreenTimeBridge] ❌ ScreenTimeModule not found!');
-  console.error('[ScreenTimeBridge] Available modules:', Object.keys(NativeModules).join(', '));
+  if (__DEV__) {
+    console.error('[ScreenTimeBridge] ❌ ScreenTimeModule not found!');
+    console.error('[ScreenTimeBridge] Available modules:', Object.keys(NativeModules).join(', '));
+  }
 } else {
-  console.log('[ScreenTimeBridge] ✅ ScreenTimeModule loaded successfully');
-  console.log('[ScreenTimeBridge] Available methods:', Object.keys(ScreenTimeModule).join(', '));
-  console.log('[ScreenTimeBridge] Module type:', typeof ScreenTimeModule);
+  if (__DEV__) {
+    console.log('[ScreenTimeBridge] ✅ ScreenTimeModule loaded successfully');
+    console.log('[ScreenTimeBridge] Available methods:', Object.keys(ScreenTimeModule).join(', '));
+    console.log('[ScreenTimeBridge] Module type:', typeof ScreenTimeModule);
+  }
 }
 
 const screenTimeEmitter = ScreenTimeModule
@@ -52,16 +56,16 @@ export interface AppSelectionResult {
 export async function requestScreenTimePermission(): Promise<ScreenTimeAuthorizationStatus> {
   if (!ScreenTimeModule) {
     const error = new Error('ScreenTimeModule not available. Please build the app using Xcode.');
-    console.error('[ScreenTimeBridge]', error.message);
+    if (__DEV__) console.error('[ScreenTimeBridge]', error.message);
     throw error;
   }
 
   try {
     const status = await ScreenTimeModule.requestScreenTimePermission();
-    console.log('[ScreenTimeBridge] Authorization status:', status);
+    if (__DEV__) console.log('[ScreenTimeBridge] Authorization status:', status);
     return status;
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to request permission:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to request permission:', error);
     throw error;
   }
 }
@@ -77,7 +81,7 @@ export async function getScreenTimePermissionStatus(): Promise<ScreenTimeAuthori
   try {
     return await ScreenTimeModule.getScreenTimePermissionStatus();
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to get permission status:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to get permission status:', error);
     return 'unknown';
   }
 }
@@ -89,14 +93,14 @@ export function subscribeToPermissionChanges(
   callback: (status: ScreenTimeAuthorizationStatus) => void
 ): () => void {
   if (!screenTimeEmitter) {
-    console.warn('[ScreenTimeBridge] Event emitter not available');
+    if (__DEV__) console.warn('[ScreenTimeBridge] Event emitter not available');
     return () => {};
   }
 
   const subscription = screenTimeEmitter.addListener(
     'SCREEN_TIME_PERMISSION_CHANGED',
     (event: { status: ScreenTimeAuthorizationStatus }) => {
-      console.log('[ScreenTimeBridge] Permission changed:', event.status);
+      if (__DEV__) console.log('[ScreenTimeBridge] Permission changed:', event.status);
       callback(event.status);
     }
   );
@@ -112,25 +116,29 @@ export function subscribeToPermissionChanges(
  * @returns Object with count of selected apps
  */
 export async function presentAppPicker(): Promise<AppSelectionResult> {
-  console.log('[ScreenTimeBridge] presentAppPicker called');
+  if (__DEV__) console.log('[ScreenTimeBridge] presentAppPicker called');
 
   if (!ScreenTimeModule) {
-    console.error('[ScreenTimeBridge] ScreenTimeModule is null/undefined!');
+    if (__DEV__) console.error('[ScreenTimeBridge] ScreenTimeModule is null/undefined!');
     throw new Error('ScreenTimeModule not available. Please build the app using Xcode to enable Screen Time features.');
   }
 
-  console.log('[ScreenTimeBridge] ScreenTimeModule exists, checking presentAppPicker method...');
-  console.log('[ScreenTimeBridge] presentAppPicker type:', typeof ScreenTimeModule.presentAppPicker);
+  if (__DEV__) {
+    console.log('[ScreenTimeBridge] ScreenTimeModule exists, checking presentAppPicker method...');
+    console.log('[ScreenTimeBridge] presentAppPicker type:', typeof ScreenTimeModule.presentAppPicker);
+  }
 
   try {
-    console.log('[ScreenTimeBridge] Calling ScreenTimeModule.presentAppPicker()...');
+    if (__DEV__) console.log('[ScreenTimeBridge] Calling ScreenTimeModule.presentAppPicker()...');
     const result = await ScreenTimeModule.presentAppPicker();
-    console.log('[ScreenTimeBridge] App selection result:', result);
+    if (__DEV__) console.log('[ScreenTimeBridge] App selection result:', result);
     return result;
   } catch (error: any) {
-    console.error('[ScreenTimeBridge] Failed to present app picker:', error);
-    console.error('[ScreenTimeBridge] Error code:', error.code);
-    console.error('[ScreenTimeBridge] Error message:', error.message);
+    if (__DEV__) {
+      console.error('[ScreenTimeBridge] Failed to present app picker:', error);
+      console.error('[ScreenTimeBridge] Error code:', error.code);
+      console.error('[ScreenTimeBridge] Error message:', error.message);
+    }
 
     // Handle user cancellation gracefully
     if (error.code === 'USER_CANCELLED' || error.message?.includes('cancelled')) {
@@ -154,7 +162,7 @@ export async function hasSelectedApps(): Promise<boolean> {
   try {
     return await ScreenTimeModule.hasSelectedApps();
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to check selected apps:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to check selected apps:', error);
     return false;
   }
 }
@@ -170,7 +178,7 @@ export async function clearSelectedApps(): Promise<boolean> {
   try {
     return await ScreenTimeModule.clearSelectedApps();
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to clear selected apps:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to clear selected apps:', error);
     return false;
   }
 }
@@ -184,16 +192,16 @@ export async function clearSelectedApps(): Promise<boolean> {
  */
 export async function startMonitoring(activityName: string): Promise<{ success: boolean; activityName?: string }> {
   if (!ScreenTimeModule) {
-    console.error('[ScreenTimeBridge] Module not available');
+    if (__DEV__) console.error('[ScreenTimeBridge] Module not available');
     return { success: false };
   }
 
   try {
     const result = await ScreenTimeModule.startMonitoring(activityName);
-    console.log('[ScreenTimeBridge] Monitoring started:', result);
+    if (__DEV__) console.log('[ScreenTimeBridge] Monitoring started:', result);
     return { success: true, activityName: result.activityName };
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to start monitoring:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to start monitoring:', error);
     return { success: false };
   }
 }
@@ -203,16 +211,16 @@ export async function startMonitoring(activityName: string): Promise<{ success: 
  */
 export async function stopMonitoring(): Promise<boolean> {
   if (!ScreenTimeModule) {
-    console.error('[ScreenTimeBridge] Module not available');
+    if (__DEV__) console.error('[ScreenTimeBridge] Module not available');
     return false;
   }
 
   try {
     await ScreenTimeModule.stopMonitoring();
-    console.log('[ScreenTimeBridge] Monitoring stopped');
+    if (__DEV__) console.log('[ScreenTimeBridge] Monitoring stopped');
     return true;
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to stop monitoring:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to stop monitoring:', error);
     return false;
   }
 }
@@ -234,10 +242,10 @@ export async function checkExtensionStatus(): Promise<{
 
   try {
     const status = await ScreenTimeModule.checkExtensionStatus();
-    console.log('[ScreenTimeBridge] Extension status:', status);
+    if (__DEV__) console.log('[ScreenTimeBridge] Extension status:', status);
     return status;
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to check extension status:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to check extension status:', error);
     return { alive: false, error: String(error) };
   }
 }
@@ -254,32 +262,36 @@ export async function checkForAppOpenedEvents(): Promise<{
   type: string;
 } | null> {
   if (!ScreenTimeModule) {
-    console.warn('[ScreenTimeBridge] ⚠️ Module not available for checking events');
+    if (__DEV__) console.warn('[ScreenTimeBridge] ⚠️ Module not available for checking events');
     return null;
   }
 
   try {
     const event = await ScreenTimeModule.checkForAppOpenedEvents();
     if (event && typeof event === 'object') {
-      console.log('[ScreenTimeBridge] ✅ App opened event detected from App Group!');
-      console.log('[ScreenTimeBridge] Event details:', JSON.stringify(event, null, 2));
+      if (__DEV__) {
+        console.log('[ScreenTimeBridge] ✅ App opened event detected from App Group!');
+        console.log('[ScreenTimeBridge] Event details:', JSON.stringify(event, null, 2));
+      }
 
       // Validate event structure
-      if (!event.appId) {
-        console.error('[ScreenTimeBridge] ❌ Event missing appId field!');
-      }
-      if (!event.timestamp) {
-        console.error('[ScreenTimeBridge] ❌ Event missing timestamp field!');
+      if (!event.appId || !event.timestamp) {
+        if (__DEV__) {
+          if (!event.appId) console.error('[ScreenTimeBridge] ❌ Event missing appId field!');
+          if (!event.timestamp) console.error('[ScreenTimeBridge] ❌ Event missing timestamp field!');
+        }
       }
 
       return event as any;
     }
     return null;
   } catch (error: any) {
-    console.error('[ScreenTimeBridge] ❌ Failed to check for events:', error);
-    console.error('[ScreenTimeBridge] Error type:', error?.constructor?.name);
-    console.error('[ScreenTimeBridge] Error message:', error?.message);
-    console.error('[ScreenTimeBridge] This may indicate App Group communication failure');
+    if (__DEV__) {
+      console.error('[ScreenTimeBridge] ❌ Failed to check for events:', error);
+      console.error('[ScreenTimeBridge] Error type:', error?.constructor?.name);
+      console.error('[ScreenTimeBridge] Error message:', error?.message);
+      console.error('[ScreenTimeBridge] This may indicate App Group communication failure');
+    }
     return null;
   }
 }
@@ -292,7 +304,7 @@ export function subscribeToAppOpened(
   callback: (event: AppOpenedEvent) => void
 ): () => void {
   if (!screenTimeEmitter) {
-    console.warn('[ScreenTimeBridge] Event emitter not available');
+    if (__DEV__) console.warn('[ScreenTimeBridge] Event emitter not available');
     return () => {};
   }
 
@@ -303,7 +315,7 @@ export function subscribeToAppOpened(
       type: string;
       data: { appToken: string };
     }) => {
-      console.log('[ScreenTimeBridge] App opened event:', nativeEvent);
+      if (__DEV__) console.log('[ScreenTimeBridge] App opened event:', nativeEvent);
 
       const event: AppOpenedEvent = {
         type: SystemEventType.APP_OPENED,
@@ -329,17 +341,17 @@ export function subscribeToAppOpened(
  */
 export async function addAppsToLibrary(appIds: string[]): Promise<boolean> {
   if (!ScreenTimeModule) {
-    console.error('[ScreenTimeBridge] Module not available');
+    if (__DEV__) console.error('[ScreenTimeBridge] Module not available');
     return false;
   }
 
   try {
-    console.log('[ScreenTimeBridge] Adding apps to library:', appIds);
+    if (__DEV__) console.log('[ScreenTimeBridge] Adding apps to library:', appIds);
     await ScreenTimeModule.addAppsToLibrary(appIds);
-    console.log('[ScreenTimeBridge] Apps added successfully');
+    if (__DEV__) console.log('[ScreenTimeBridge] Apps added successfully');
     return true;
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to add apps to library:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to add apps to library:', error);
     return false;
   }
 }
@@ -349,17 +361,17 @@ export async function addAppsToLibrary(appIds: string[]): Promise<boolean> {
  */
 export async function removeAppFromLibrary(appId: string): Promise<boolean> {
   if (!ScreenTimeModule) {
-    console.error('[ScreenTimeBridge] Module not available');
+    if (__DEV__) console.error('[ScreenTimeBridge] Module not available');
     return false;
   }
 
   try {
-    console.log('[ScreenTimeBridge] Removing app from library:', appId);
+    if (__DEV__) console.log('[ScreenTimeBridge] Removing app from library:', appId);
     await ScreenTimeModule.removeAppFromLibrary(appId);
-    console.log('[ScreenTimeBridge] App removed successfully');
+    if (__DEV__) console.log('[ScreenTimeBridge] App removed successfully');
     return true;
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to remove app from library:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to remove app from library:', error);
     return false;
   }
 }
@@ -370,17 +382,17 @@ export async function removeAppFromLibrary(appId: string): Promise<boolean> {
  */
 export async function startGlobalAppMonitoring(): Promise<boolean> {
   if (!ScreenTimeModule) {
-    console.error('[ScreenTimeBridge] Module not available');
+    if (__DEV__) console.error('[ScreenTimeBridge] Module not available');
     return false;
   }
 
   try {
-    console.log('[ScreenTimeBridge] Starting global app monitoring...');
+    if (__DEV__) console.log('[ScreenTimeBridge] Starting global app monitoring...');
     await ScreenTimeModule.startGlobalAppMonitoring();
-    console.log('[ScreenTimeBridge] Global app monitoring started');
+    if (__DEV__) console.log('[ScreenTimeBridge] Global app monitoring started');
     return true;
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to start global app monitoring:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to start global app monitoring:', error);
     return false;
   }
 }
@@ -390,17 +402,17 @@ export async function startGlobalAppMonitoring(): Promise<boolean> {
  */
 export async function stopGlobalAppMonitoring(): Promise<boolean> {
   if (!ScreenTimeModule) {
-    console.error('[ScreenTimeBridge] Module not available');
+    if (__DEV__) console.error('[ScreenTimeBridge] Module not available');
     return false;
   }
 
   try {
-    console.log('[ScreenTimeBridge] Stopping global app monitoring...');
+    if (__DEV__) console.log('[ScreenTimeBridge] Stopping global app monitoring...');
     await ScreenTimeModule.stopGlobalAppMonitoring();
-    console.log('[ScreenTimeBridge] Global app monitoring stopped');
+    if (__DEV__) console.log('[ScreenTimeBridge] Global app monitoring stopped');
     return true;
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to stop global app monitoring:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to stop global app monitoring:', error);
     return false;
   }
 }
@@ -410,16 +422,16 @@ export async function stopGlobalAppMonitoring(): Promise<boolean> {
  */
 export async function getGlobalAppCount(): Promise<number> {
   if (!ScreenTimeModule) {
-    console.error('[ScreenTimeBridge] Module not available');
+    if (__DEV__) console.error('[ScreenTimeBridge] Module not available');
     return 0;
   }
 
   try {
     const count = await ScreenTimeModule.getGlobalAppCount();
-    console.log('[ScreenTimeBridge] Global app count:', count);
+    if (__DEV__) console.log('[ScreenTimeBridge] Global app count:', count);
     return count;
   } catch (error) {
-    console.error('[ScreenTimeBridge] Failed to get global app count:', error);
+    if (__DEV__) console.error('[ScreenTimeBridge] Failed to get global app count:', error);
     return 0;
   }
 }

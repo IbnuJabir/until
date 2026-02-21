@@ -32,7 +32,7 @@ export const WarmColors = {
   // Text - More refined hierarchy
   textPrimary: '#2A2826',
   textSecondary: '#6B6661',
-  textTertiary: '#A39E98',
+  textTertiary: '#6E6860',
   textOnPrimary: '#FFFFFF',
 
   // Status - Softer, more harmonious

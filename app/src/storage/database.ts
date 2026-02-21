@@ -665,6 +665,30 @@ export async function incrementPlaceUsage(id: string): Promise<void> {
   if (__DEV__) console.log(`[Database] Incremented usage count for place: ${id}`);
 }
 
+/**
+ * Prune saved places that have never been used and are older than the given age
+ * Default: remove places older than 90 days with zero usage
+ */
+export async function pruneUnusedSavedPlaces(maxAgeMs: number = 90 * 24 * 60 * 60 * 1000): Promise<number> {
+  const db = openDatabase();
+  const cutoff = Date.now() - maxAgeMs;
+
+  try {
+    const result = db.runSync(
+      `DELETE FROM saved_places WHERE usage_count = 0 AND created_at < ?;`,
+      [cutoff]
+    );
+    const deleted = result.changes;
+    if (__DEV__ && deleted > 0) {
+      console.log(`[Database] Pruned ${deleted} unused saved places`);
+    }
+    return deleted;
+  } catch (error) {
+    if (__DEV__) console.error('[Database] Failed to prune unused saved places:', error);
+    return 0;
+  }
+}
+
 // ============================================================================
 // GLOBAL APPS CRUD (App Library for Screen Time Monitoring)
 // ============================================================================

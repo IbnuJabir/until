@@ -9,11 +9,25 @@
  */
 
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert, Linking } from 'react-native';
 import { Reminder } from '../domain';
 
 // Notification category identifier
 const REMINDER_CATEGORY = 'reminder';
+const NOTIFICATION_SOUND_KEY = '@notification_sound_enabled';
+
+/**
+ * Read user's notification sound preference
+ */
+async function isSoundEnabled(): Promise<boolean> {
+  try {
+    const val = await AsyncStorage.getItem(NOTIFICATION_SOUND_KEY);
+    return val !== 'false'; // Default is true
+  } catch {
+    return true;
+  }
+}
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -189,6 +203,8 @@ export async function scheduleNotificationAtTime(
       throw new Error('Scheduled time must be in the future');
     }
 
+    const soundOn = await isSoundEnabled();
+
     // Schedule notification for specific timestamp
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
@@ -198,7 +214,7 @@ export async function scheduleNotificationAtTime(
           reminderId: reminder.id,
           firedAt: Date.now(),
         },
-        sound: true,
+        sound: soundOn,
         priority: Notifications.AndroidNotificationPriority.HIGH,
         // iOS 15+ time-sensitive notifications
         interruptionLevel: 'timeSensitive' as any,
@@ -234,6 +250,8 @@ export async function fireNotification(reminder: Reminder, retries = 2): Promise
       throw new Error('Notification permission not granted');
     }
 
+    const soundOn = await isSoundEnabled();
+
     // Schedule immediate notification
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
@@ -243,7 +261,7 @@ export async function fireNotification(reminder: Reminder, retries = 2): Promise
           reminderId: reminder.id,
           firedAt: Date.now(),
         },
-        sound: true,
+        sound: soundOn,
         priority: Notifications.AndroidNotificationPriority.HIGH,
         // iOS 15+ time-sensitive notifications (like Calendar/Reminders apps)
         interruptionLevel: 'timeSensitive' as any,

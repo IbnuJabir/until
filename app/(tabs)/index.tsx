@@ -196,6 +196,8 @@ export default function RemindersScreen() {
         style={styles.emptyStateButton}
         onPress={handleCreateReminder}
         activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel="Create your first reminder"
       >
         <MaterialIcons name="add" size={20} color={WarmColors.textOnPrimary} />
         <Text style={styles.emptyStateButtonText}>Create Reminder</Text>
@@ -208,10 +210,10 @@ export default function RemindersScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Until</Text>
+          <Text style={styles.headerTitle} allowFontScaling={false}>Until</Text>
           <View style={styles.headerSubtitleContainer}>
             <View style={[styles.proBadge, entitlements.hasProAccess && styles.proBadgeActive]}>
-              <Text style={styles.proBadgeText}>
+              <Text style={styles.proBadgeText} allowFontScaling={false}>
                 {entitlements.hasProAccess ? 'Pro' : 'Free'}
               </Text>
             </View>
@@ -227,8 +229,10 @@ export default function RemindersScreen() {
                 style={styles.selectAllButton}
                 onPress={selectedIds.size === reminders.length ? handleDeselectAll : handleSelectAll}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={selectedIds.size === reminders.length ? 'Deselect all reminders' : 'Select all reminders'}
               >
-                <Text style={styles.selectAllButtonText}>
+                <Text style={styles.selectAllButtonText} allowFontScaling={false}>
                   {selectedIds.size === reminders.length ? 'Deselect All' : 'Select All'}
                 </Text>
               </TouchableOpacity>
@@ -236,8 +240,10 @@ export default function RemindersScreen() {
                 style={styles.doneButton}
                 onPress={handleToggleSelectionMode}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Done selecting"
               >
-                <Text style={styles.doneButtonText}>Done</Text>
+                <Text style={styles.doneButtonText} allowFontScaling={false}>Done</Text>
               </TouchableOpacity>
             </>
           )}
@@ -248,17 +254,21 @@ export default function RemindersScreen() {
                   style={styles.selectButton}
                   onPress={handleToggleSelectionMode}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select reminders"
                 >
-                  <MaterialIcons name="check-circle-outline" size={20} color={WarmColors.primary} />
-                  <Text style={styles.selectButtonText}>Select</Text>
+                  <MaterialIcons name="check-circle-outline" size={16} color={WarmColors.primary} />
+                  <Text style={styles.selectButtonText} allowFontScaling={false}>Select</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
                 style={styles.voiceButton}
                 onPress={() => router.push('/voice-reminder' as any)}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Create voice reminder"
               >
-                <MaterialIcons name="mic" size={20} color={WarmColors.textOnPrimary} />
+                <MaterialIcons name="mic" size={16} color={WarmColors.textOnPrimary} />
               </TouchableOpacity>
             </>
           )}
@@ -307,6 +317,8 @@ export default function RemindersScreen() {
           style={styles.fab}
           onPress={handleCreateReminder}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Create new reminder"
         >
           <MaterialIcons name="add" size={28} color={WarmColors.textOnPrimary} />
         </TouchableOpacity>
@@ -323,7 +335,7 @@ export default function RemindersScreen() {
       <Toast
         message={toastMessage}
         visible={showToast}
-        duration={3000}
+        duration={4000}
         onHide={() => setShowToast(false)}
       />
     </View>
@@ -381,8 +393,8 @@ const styles = StyleSheet.create({
   },
   voiceButton: {
     backgroundColor: WarmColors.secondary,
-    width: 44,
-    height: 44,
+    width: 34,
+    height: 34,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -566,14 +578,14 @@ const styles = StyleSheet.create({
   selectButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
     borderRadius: BorderRadius.md,
     backgroundColor: `${WarmColors.primary}15`,
   },
   selectButtonText: {
-    ...Typography.caption,
+    ...Typography.small,
     color: WarmColors.primary,
     fontWeight: '600',
   },

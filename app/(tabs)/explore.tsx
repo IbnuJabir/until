@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Share, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useReminderStore } from '@/app/src/store/reminderStore';
 import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 import { setThemePreference, getThemePreference, type ThemePreference } from '@/hooks/use-color-scheme';
+
+const NOTIFICATION_SOUND_KEY = '@notification_sound_enabled';
 
 interface SettingsItem {
   id: string;
@@ -19,6 +22,20 @@ export default function ExploreScreen() {
   const router = useRouter();
   const { reminders, loadFromStorage } = useReminderStore();
   const [themePref, setThemePref] = useState<ThemePreference>(getThemePreference());
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem(NOTIFICATION_SOUND_KEY).then((val) => {
+      // Default is true (sound on); only false if explicitly disabled
+      setSoundEnabled(val !== 'false');
+    });
+  }, []);
+
+  const handleSoundToggle = async () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    await AsyncStorage.setItem(NOTIFICATION_SOUND_KEY, next ? 'true' : 'false');
+  };
 
   const handleThemeToggle = () => {
     const nextTheme: ThemePreference =
@@ -102,6 +119,14 @@ export default function ExploreScreen() {
       icon: 'brightness-6',
       color: WarmColors.secondary,
       onPress: handleThemeToggle,
+    },
+    {
+      id: 'notification-sound',
+      title: 'Notification Sound',
+      subtitle: soundEnabled ? 'Sound: On — Tap to mute' : 'Sound: Off — Tap to enable',
+      icon: soundEnabled ? 'volume-up' : 'volume-off',
+      color: WarmColors.primary,
+      onPress: handleSoundToggle,
     },
   ];
 
