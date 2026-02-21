@@ -26,12 +26,16 @@ import {
 import { parseVoiceReminder, getTriggerDescription, getActivationDescription } from '@/app/src/utils/ReminderParser';
 import type { ParsedReminder, ParsedTrigger } from '@/app/src/utils/ReminderParser';
 import { useReminderStore } from '@/app/src/store/reminderStore';
-import { createReminder, createTrigger, TriggerType } from '@/app/src/domain';
+import { useScreenTime } from '@/app/src/hooks/useScreenTime';
+import { createReminder, createTrigger, createSavedPlace, TriggerType, LocationConfig, SavedPlace } from '@/app/src/domain';
+import SavedPlacesList from '@/app/src/ui/SavedPlacesList';
+import MapPicker from '@/app/src/ui/MapPicker';
 import { WarmColors, Elevation, Spacing, BorderRadius, Typography } from '@/constants/theme';
 
 export default function VoiceReminderScreen() {
   const router = useRouter();
-  const { addReminder, getSavedPlaceById, savedPlaces } = useReminderStore();
+  const { addReminder, savedPlaces, addSavedPlace, incrementPlaceUsage } = useReminderStore();
+  const screenTime = useScreenTime();
 
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -39,6 +43,16 @@ export default function VoiceReminderScreen() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pulseAnim] = useState(new Animated.Value(1));
+
+  // Resolution queue state
+  const [pendingQueue, setPendingQueue] = useState<ParsedTrigger[]>([]);
+  const [queueIndex, setQueueIndex] = useState(-1);
+  const [resolvedTriggers, setResolvedTriggers] = useState<any[]>([]);
+  const [directTriggers, setDirectTriggers] = useState<any[]>([]);
+
+  // Location modal state
+  const [showSavedPlacesList, setShowSavedPlacesList] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
 
   // Reset all voice state on mount so returning to this screen starts fresh
   useEffect(() => {
@@ -49,6 +63,16 @@ export default function VoiceReminderScreen() {
     pulseAnim.stopAnimation();
     pulseAnim.setValue(1);
   }, []);
+
+  // Derived: whether any parsed trigger needs user input to resolve
+  const hasUnresolvedTriggers = parsedReminder?.triggers.some(
+    (t) =>
+      (t.type === TriggerType.LOCATION_ENTER &&
+        !savedPlaces.some((p) =>
+          p.name.toLowerCase().includes((t.locationQuery || '').toLowerCase())
+        )) ||
+      t.type === TriggerType.APP_OPENED
+  ) ?? false;
 
   // Listen for speech recognition results
   useSpeechRecognitionEvent('result', (event) => {
@@ -75,10 +99,7 @@ export default function VoiceReminderScreen() {
     pulseAnim.stopAnimation();
     pulseAnim.setValue(1);
 
-    // 'no-speech' is very common (silence / background noise) — keep any existing
-    // transcript/draft intact and show a soft, non-blocking message
     if (event.error === 'no-speech') {
-      // Only show the hint if the user hasn't already captured something
       setError('No speech detected — tap the mic and speak clearly.');
     } else if (event.error === 'audio-capture') {
       setError('Microphone error. Please check permissions.');
@@ -97,7 +118,6 @@ export default function VoiceReminderScreen() {
   });
 
   const startListening = async () => {
-    // Reset all state immediately before any async work so UI is clean
     setTranscript('');
     setParsedReminder(null);
     setError(null);
@@ -105,14 +125,12 @@ export default function VoiceReminderScreen() {
     pulseAnim.setValue(1);
 
     try {
-      // Always stop any previous session first to avoid "already running" errors
       try {
         await ExpoSpeechRecognitionModule.stop();
       } catch {
         // Ignore — it may not have been running
       }
 
-      // Check network connectivity (speech recognition requires network)
       const { checkNetworkConnectivity } = await import('@/app/src/utils/NetworkUtils');
       const isOnline = await checkNetworkConnectivity();
       if (!isOnline) {
@@ -120,10 +138,6 @@ export default function VoiceReminderScreen() {
         return;
       }
 
-      // These debug checks are removed as the methods don't exist on ExpoSpeechRecognitionModule
-      // The module will handle platform-specific availability checks internally
-
-      // Start speech recognition (permissions will be requested automatically)
       await ExpoSpeechRecognitionModule.start({
         lang: 'en-US',
         interimResults: true,
@@ -134,7 +148,6 @@ export default function VoiceReminderScreen() {
 
       setIsListening(true);
 
-      // Start pulse animation
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -153,7 +166,6 @@ export default function VoiceReminderScreen() {
       if (__DEV__) console.error('[VoiceReminder] Failed to start speech recognition:', err);
       setIsListening(false);
 
-      // Handle permission errors
       if (err.message?.includes('permission') || err.message?.includes('denied')) {
         Alert.alert(
           'Permission Required',
@@ -177,111 +189,29 @@ export default function VoiceReminderScreen() {
     }
   };
 
-  const resolveLocationTrigger = async (trigger: ParsedTrigger): Promise<any> => {
-    if (!trigger.locationQuery) {
-      return null;
-    }
-
-    // Search saved places for match
-    const query = trigger.locationQuery.toLowerCase();
-    const matchedPlace = savedPlaces.find((place) =>
-      place.name.toLowerCase().includes(query)
-    );
-
-    if (matchedPlace) {
-      return createTrigger(
-        TriggerType.LOCATION_ENTER,
-        {
-          latitude: matchedPlace.latitude,
-          longitude: matchedPlace.longitude,
-          radius: matchedPlace.radius,
-          name: matchedPlace.name,
-        },
-        trigger.activationDateTime
-      );
-    }
-
-    // Location not found - create placeholder that user can edit later
-    if (__DEV__) console.log(`[VoiceReminder] Location "${trigger.locationQuery}" not found, creating placeholder`);
-    return createTrigger(
-      TriggerType.LOCATION_ENTER,
-      {
-        latitude: 0,
-        longitude: 0,
-        radius: 100,
-        name: `${trigger.locationQuery} (Edit location)`,
-      },
-      trigger.activationDateTime
-    );
+  // Reset the entire resolution queue (used when user cancels mid-flow)
+  const resetQueue = () => {
+    setPendingQueue([]);
+    setQueueIndex(-1);
+    setResolvedTriggers([]);
+    setDirectTriggers([]);
   };
 
-  const createReminderFromVoice = async () => {
-    if (!parsedReminder || !parsedReminder.title) {
-      Alert.alert('Error', 'Please speak a reminder first');
+  // Final step: create and persist the reminder with all resolved triggers
+  const finalizeReminder = async (allTriggers: any[]) => {
+    if (allTriggers.length === 0) {
+      Alert.alert(
+        'No Triggers',
+        'Please specify when you want to be reminded (e.g., "tomorrow at 3pm", "when I get home")',
+        [{ text: 'OK' }]
+      );
       return;
     }
 
     setIsCreating(true);
-
     try {
-      const triggers = [];
-
-      // Resolve triggers
-      for (const parsedTrigger of parsedReminder.triggers) {
-        if (parsedTrigger.type === TriggerType.LOCATION_ENTER) {
-          const trigger = await resolveLocationTrigger(parsedTrigger);
-          if (trigger) {
-            triggers.push(trigger);
-          } else {
-            // Location couldn't be resolved - skip this trigger
-            continue;
-          }
-        } else if (parsedTrigger.type === TriggerType.APP_OPENED) {
-          // Create placeholder app trigger - user can select actual app later
-          if (__DEV__) console.log(`[VoiceReminder] Creating placeholder app trigger for "${parsedTrigger.appQuery}"`);
-          triggers.push(
-            createTrigger(
-              TriggerType.APP_OPENED,
-              {
-                appId: 'unknown',
-                displayName: `${parsedTrigger.appQuery || 'Unknown App'} (Select app)`,
-              },
-              parsedTrigger.activationDateTime
-            )
-          );
-        } else {
-          // Other triggers (scheduled time, charging, unlock)
-          triggers.push(
-            createTrigger(
-              parsedTrigger.type,
-              parsedTrigger.config || null,
-              parsedTrigger.activationDateTime
-            )
-          );
-        }
-      }
-
-      // Must have at least one trigger
-      if (triggers.length === 0) {
-        Alert.alert(
-          'No Triggers',
-          'Please specify when you want to be reminded (e.g., "tomorrow at 3pm", "when I get home")',
-          [{ text: 'OK' }]
-        );
-        setIsCreating(false);
-        return;
-      }
-
-      // Create reminder
-      const reminder = createReminder(
-        parsedReminder.title,
-        triggers,
-        [] // No conditions for MVP
-      );
-
+      const reminder = createReminder(parsedReminder!.title, allTriggers, []);
       await addReminder(reminder);
-
-      // Navigate back with success message
       router.dismissAll();
       router.replace('/(tabs)?message=Voice reminder created!' as any);
     } catch (err) {
@@ -289,6 +219,267 @@ export default function VoiceReminderScreen() {
       Alert.alert('Error', 'Failed to create reminder. Please try again.');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  // Advance to the next item in the resolution queue (or finalize if done)
+  // Accepts explicit parameters to avoid stale closure issues
+  const advanceResolutionQueue = (
+    resolvedTrigger: any,
+    currentResolved: any[],
+    currentDirect: any[],
+    queue: ParsedTrigger[],
+    idx: number
+  ) => {
+    const nextResolved = [...currentResolved, resolvedTrigger];
+    const nextIdx = idx + 1;
+    if (nextIdx < queue.length) {
+      setResolvedTriggers(nextResolved);
+      setQueueIndex(nextIdx);
+      startResolvingTrigger(queue[nextIdx]);
+    } else {
+      finalizeReminder([...currentDirect, ...nextResolved]);
+      resetQueue();
+    }
+  };
+
+  // Dispatch to the correct modal/flow for a given pending trigger
+  const startResolvingTrigger = (trigger: ParsedTrigger) => {
+    if (trigger.type === TriggerType.LOCATION_ENTER) {
+      setShowSavedPlacesList(true);
+    } else if (trigger.type === TriggerType.APP_OPENED) {
+      handleAppTriggerResolution(trigger);
+    }
+  };
+
+  // Entry point when user taps Create / Select Trigger Details
+  const handleCreateTapped = () => {
+    if (!parsedReminder || !parsedReminder.title) {
+      Alert.alert('Error', 'Please speak a reminder first');
+      return;
+    }
+
+    const direct: any[] = [];
+    const pending: ParsedTrigger[] = [];
+
+    for (const parsedTrigger of parsedReminder.triggers) {
+      if (parsedTrigger.type === TriggerType.LOCATION_ENTER) {
+        const query = (parsedTrigger.locationQuery || '').toLowerCase();
+        const matched = savedPlaces.find((p) => p.name.toLowerCase().includes(query));
+        if (matched) {
+          direct.push(
+            createTrigger(
+              TriggerType.LOCATION_ENTER,
+              {
+                latitude: matched.latitude,
+                longitude: matched.longitude,
+                radius: matched.radius,
+                name: matched.name,
+              },
+              parsedTrigger.activationDateTime
+            )
+          );
+        } else {
+          pending.push(parsedTrigger);
+        }
+      } else if (parsedTrigger.type === TriggerType.APP_OPENED) {
+        // App triggers always need user to pick via FamilyActivityPicker
+        pending.push(parsedTrigger);
+      } else {
+        // SCHEDULED_TIME, CHARGING_STARTED, PHONE_UNLOCK — resolve immediately
+        direct.push(
+          createTrigger(
+            parsedTrigger.type,
+            parsedTrigger.config || null,
+            parsedTrigger.activationDateTime
+          )
+        );
+      }
+    }
+
+    if (pending.length === 0) {
+      // All triggers auto-resolved — create immediately
+      finalizeReminder(direct);
+      return;
+    }
+
+    // Start sequential resolution
+    setDirectTriggers(direct);
+    setResolvedTriggers([]);
+    setPendingQueue(pending);
+    setQueueIndex(0);
+    startResolvingTrigger(pending[0]);
+  };
+
+  // --- Location handlers ---
+
+  const handleSelectSavedPlace = async (place: SavedPlace) => {
+    setShowSavedPlacesList(false);
+    const currentParsedTrigger = pendingQueue[queueIndex];
+    const resolvedTrigger = createTrigger(
+      TriggerType.LOCATION_ENTER,
+      {
+        latitude: place.latitude,
+        longitude: place.longitude,
+        radius: place.radius,
+        name: place.name,
+      },
+      currentParsedTrigger?.activationDateTime
+    );
+    await incrementPlaceUsage(place.id);
+    advanceResolutionQueue(resolvedTrigger, resolvedTriggers, directTriggers, pendingQueue, queueIndex);
+  };
+
+  const handleAddNewPlace = () => {
+    setShowSavedPlacesList(false);
+    setShowMapPicker(true);
+  };
+
+  const handleMapPickerSave = async (location: LocationConfig & { name: string }) => {
+    try {
+      const newPlace = createSavedPlace(
+        location.name,
+        location.latitude,
+        location.longitude,
+        location.radius
+      );
+      await addSavedPlace(newPlace);
+      const currentParsedTrigger = pendingQueue[queueIndex];
+      const resolvedTrigger = createTrigger(
+        TriggerType.LOCATION_ENTER,
+        { ...location },
+        currentParsedTrigger?.activationDateTime
+      );
+      setShowMapPicker(false);
+      advanceResolutionQueue(resolvedTrigger, resolvedTriggers, directTriggers, pendingQueue, queueIndex);
+    } catch (err) {
+      if (__DEV__) console.error('[VoiceReminder] Failed to save location:', err);
+      Alert.alert('Error', 'Failed to save location. Please try again.');
+    }
+  };
+
+  const handleMapPickerCancel = () => {
+    setShowMapPicker(false);
+    setShowSavedPlacesList(true);
+  };
+
+  // --- App trigger handlers ---
+
+  const handleAppTriggerResolution = async (parsedTrigger: ParsedTrigger) => {
+    if (screenTime.isLoading) return;
+
+    if (screenTime.authStatus === 'unknown' && screenTime.error) {
+      Alert.alert(
+        'Feature Not Available',
+        'Screen Time monitoring is not available on this device. This feature requires native iOS modules that need to be built with Xcode.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (!screenTime.isAuthorized) {
+      Alert.alert(
+        'Screen Time Permission Required',
+        'Until needs Screen Time permission to detect when you open specific apps. You will choose which apps to monitor.',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: resetQueue },
+          {
+            text: 'Continue',
+            onPress: async () => {
+              try {
+                const status = await screenTime.requestPermission();
+                if (status === 'approved') {
+                  await showAppPickerForVoice(parsedTrigger);
+                } else {
+                  Alert.alert(
+                    'Permission Denied',
+                    'Screen Time permission is required for app-based reminders. Please enable it in Settings.',
+                    [{ text: 'OK' }]
+                  );
+                  resetQueue();
+                }
+              } catch (err: any) {
+                if (__DEV__) console.error('[VoiceReminder] Permission request failed:', err);
+                Alert.alert('Error', err.message || 'Failed to request Screen Time permission.');
+                resetQueue();
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    await showAppPickerForVoice(parsedTrigger);
+  };
+
+  const showAppPickerForVoice = async (parsedTrigger: ParsedTrigger) => {
+    // Capture queue state at call time to avoid stale closures in Alert.onPress
+    const capturedResolved = resolvedTriggers;
+    const capturedDirect = directTriggers;
+    const capturedQueue = pendingQueue;
+    const capturedIndex = queueIndex;
+
+    try {
+      const result = await screenTime.showAppPicker();
+
+      if (result && result.selectedCount > 0) {
+        const timestamp = Date.now();
+        const appIds = Array.from({ length: result.selectedCount }, (_, i) => `app_${timestamp}_${i}`);
+
+        const { addAppsToLibrary, startGlobalAppMonitoring, stopGlobalAppMonitoring } =
+          await import('@/app/src/native-bridge/ScreenTimeBridge');
+
+        const success = await addAppsToLibrary(appIds);
+        if (!success) throw new Error('Failed to add apps to global library');
+
+        // Restart global monitoring to include the newly added apps
+        await stopGlobalAppMonitoring();
+        await startGlobalAppMonitoring();
+
+        const resolvedTrigger = createTrigger(
+          TriggerType.APP_OPENED,
+          {
+            appId: appIds[0],
+            displayName: parsedTrigger.appQuery || 'Selected App',
+          },
+          parsedTrigger.activationDateTime
+        );
+
+        Alert.alert(
+          'Apps Selected',
+          `${result.selectedCount} app(s) added. The reminder will fire when any of them are opened.`,
+          [
+            {
+              text: 'OK',
+              onPress: () =>
+                advanceResolutionQueue(
+                  resolvedTrigger,
+                  capturedResolved,
+                  capturedDirect,
+                  capturedQueue,
+                  capturedIndex
+                ),
+            },
+          ]
+        );
+      } else if (result === null) {
+        // User cancelled
+        if (__DEV__) console.log('[VoiceReminder] User cancelled app selection');
+        resetQueue();
+      }
+    } catch (err: any) {
+      if (__DEV__) console.error('[VoiceReminder] App picker error:', err);
+      if (err.message?.includes('not available') || screenTime.error) {
+        Alert.alert(
+          'Feature Not Available',
+          'Screen Time monitoring requires a native Xcode build.\n\n1. Open ios/until.xcworkspace in Xcode\n2. Build and run on your device',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', err.message || 'Failed to show app picker. Please try again.');
+      }
+      resetQueue();
     }
   };
 
@@ -334,10 +525,10 @@ export default function VoiceReminderScreen() {
               accessibilityLabel={isListening ? 'Stop voice recording' : 'Start voice recording'}
               accessibilityState={{ disabled: isCreating }}
             >
-              <MaterialIcons 
-                name={isListening ? 'mic' : 'mic-none'} 
-                size={48} 
-                color={WarmColors.textOnPrimary} 
+              <MaterialIcons
+                name={isListening ? 'mic' : 'mic-none'}
+                size={48}
+                color={WarmColors.textOnPrimary}
               />
             </TouchableOpacity>
           </Animated.View>
@@ -378,14 +569,34 @@ export default function VoiceReminderScreen() {
             {parsedReminder.triggers.length > 0 && (
               <>
                 <Text style={styles.triggersLabel}>Triggers:</Text>
-                {parsedReminder.triggers.map((trigger, idx) => (
-                  <View key={idx} style={styles.triggerItem}>
-                    <MaterialIcons name="check-circle" size={16} color={WarmColors.primary} />
-                    <Text style={styles.triggerText}>
-                      {getTriggerDescription(trigger)}
-                    </Text>
-                  </View>
-                ))}
+                {parsedReminder.triggers.map((trigger, idx) => {
+                  const isUnresolved =
+                    (trigger.type === TriggerType.LOCATION_ENTER &&
+                      !savedPlaces.some((p) =>
+                        p.name.toLowerCase().includes((trigger.locationQuery || '').toLowerCase())
+                      )) ||
+                    trigger.type === TriggerType.APP_OPENED;
+
+                  return (
+                    <View key={idx} style={styles.triggerItem}>
+                      <MaterialIcons
+                        name={isUnresolved ? 'warning' : 'check-circle'}
+                        size={16}
+                        color={isUnresolved ? WarmColors.warning : WarmColors.primary}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.triggerText, isUnresolved && styles.triggerTextUnresolved]}>
+                          {getTriggerDescription(trigger)}
+                        </Text>
+                        {isUnresolved && (
+                          <Text style={styles.unresolvedHint}>
+                            Tap &quot;Select Trigger Details&quot; to choose
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
               </>
             )}
 
@@ -398,25 +609,37 @@ export default function VoiceReminderScreen() {
               </View>
             )}
 
-            {/* Create button */}
+            {/* Create / Select Trigger Details button */}
             <TouchableOpacity
               style={[
                 styles.createButton,
                 (isCreating || parsedReminder.triggers.length === 0) && styles.createButtonDisabled,
               ]}
-              onPress={createReminderFromVoice}
+              onPress={handleCreateTapped}
               disabled={isCreating || parsedReminder.triggers.length === 0}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel={isCreating ? 'Creating reminder' : 'Create reminder from voice'}
+              accessibilityLabel={
+                isCreating
+                  ? 'Creating reminder'
+                  : hasUnresolvedTriggers
+                  ? 'Select trigger details'
+                  : 'Create reminder from voice'
+              }
               accessibilityState={{ disabled: isCreating || parsedReminder.triggers.length === 0 }}
             >
               {isCreating ? (
                 <ActivityIndicator color={WarmColors.textOnPrimary} />
               ) : (
                 <>
-                  <MaterialIcons name="check-circle" size={20} color={WarmColors.textOnPrimary} />
-                  <Text style={styles.createButtonText}>Create Reminder</Text>
+                  <MaterialIcons
+                    name={hasUnresolvedTriggers ? 'touch-app' : 'check-circle'}
+                    size={20}
+                    color={WarmColors.textOnPrimary}
+                  />
+                  <Text style={styles.createButtonText}>
+                    {hasUnresolvedTriggers ? 'Select Trigger Details' : 'Create Reminder'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -429,6 +652,34 @@ export default function VoiceReminderScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Location: SavedPlacesList as full-screen overlay */}
+      {showSavedPlacesList && (
+        <View style={styles.fullScreenModal}>
+          <SavedPlacesList
+            onSelectPlace={handleSelectSavedPlace}
+            onAddNewPlace={handleAddNewPlace}
+          />
+          <TouchableOpacity
+            style={styles.closeModalButton}
+            onPress={() => {
+              setShowSavedPlacesList(false);
+              resetQueue();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel location selection"
+          >
+            <Text style={styles.closeModalText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Location: MapPicker (has its own Modal internally) */}
+      <MapPicker
+        visible={showMapPicker}
+        onSave={handleMapPickerSave}
+        onCancel={handleMapPickerCancel}
+      />
     </View>
   );
 }
@@ -590,6 +841,15 @@ const styles = StyleSheet.create({
     color: WarmColors.primary,
     flex: 1,
   },
+  triggerTextUnresolved: {
+    color: WarmColors.warning,
+  },
+  unresolvedHint: {
+    ...Typography.small,
+    color: WarmColors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
   lowConfidenceWarning: {
     backgroundColor: `${WarmColors.warning}20`,
     borderRadius: BorderRadius.sm,
@@ -629,5 +889,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.sm,
     fontStyle: 'italic',
+  },
+  // Full-screen modal overlay (for SavedPlacesList)
+  fullScreenModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: WarmColors.background,
+    zIndex: 1000,
+  },
+  closeModalButton: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    backgroundColor: WarmColors.surfaceVariant,
+    paddingVertical: 16,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+  },
+  closeModalText: {
+    ...Typography.bodyBold,
+    color: WarmColors.textSecondary,
   },
 });
