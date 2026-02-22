@@ -4,7 +4,7 @@
  * MVP: In-app voice recording with local parsing
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -45,6 +45,13 @@ export default function VoiceReminderScreen() {
   const [pulseAnim] = useState(new Animated.Value(1));
 
   // Resolution queue state
+  // FIX: Use refs for queue state to avoid stale closure issues in Alert callbacks
+  const pendingQueueRef = useRef<ParsedTrigger[]>([]);
+  const queueIndexRef = useRef(-1);
+  const resolvedTriggersRef = useRef<any[]>([]);
+  const directTriggersRef = useRef<any[]>([]);
+
+  // UI state for triggering re-renders
   const [pendingQueue, setPendingQueue] = useState<ParsedTrigger[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
   const [resolvedTriggers, setResolvedTriggers] = useState<any[]>([]);
@@ -53,6 +60,23 @@ export default function VoiceReminderScreen() {
   // Location modal state
   const [showSavedPlacesList, setShowSavedPlacesList] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
+
+  // FIX: Keep refs in sync with state
+  useEffect(() => {
+    pendingQueueRef.current = pendingQueue;
+  }, [pendingQueue]);
+
+  useEffect(() => {
+    queueIndexRef.current = queueIndex;
+  }, [queueIndex]);
+
+  useEffect(() => {
+    resolvedTriggersRef.current = resolvedTriggers;
+  }, [resolvedTriggers]);
+
+  useEffect(() => {
+    directTriggersRef.current = directTriggers;
+  }, [directTriggers]);
 
   // Reset all voice state on mount so returning to this screen starts fresh
   useEffect(() => {
@@ -195,6 +219,11 @@ export default function VoiceReminderScreen() {
     setQueueIndex(-1);
     setResolvedTriggers([]);
     setDirectTriggers([]);
+    // FIX: Also reset refs
+    pendingQueueRef.current = [];
+    queueIndexRef.current = -1;
+    resolvedTriggersRef.current = [];
+    directTriggersRef.current = [];
   };
 
   // Final step: create and persist the reminder with all resolved triggers
@@ -223,19 +252,25 @@ export default function VoiceReminderScreen() {
   };
 
   // Advance to the next item in the resolution queue (or finalize if done)
-  // Accepts explicit parameters to avoid stale closure issues
-  const advanceResolutionQueue = (
-    resolvedTrigger: any,
-    currentResolved: any[],
-    currentDirect: any[],
-    queue: ParsedTrigger[],
-    idx: number
-  ) => {
+  // FIX: Use refs directly to get current values and avoid stale closures in Alert callbacks
+  const advanceResolutionQueue = (resolvedTrigger: any) => {
+    const currentResolved = resolvedTriggersRef.current;
+    const currentDirect = directTriggersRef.current;
+    const queue = pendingQueueRef.current;
+    const idx = queueIndexRef.current;
+
     const nextResolved = [...currentResolved, resolvedTrigger];
     const nextIdx = idx + 1;
+
+    // Update refs immediately
+    resolvedTriggersRef.current = nextResolved;
+    queueIndexRef.current = nextIdx;
+
+    // Update state for UI
+    setResolvedTriggers(nextResolved);
+    setQueueIndex(nextIdx);
+
     if (nextIdx < queue.length) {
-      setResolvedTriggers(nextResolved);
-      setQueueIndex(nextIdx);
       startResolvingTrigger(queue[nextIdx]);
     } else {
       finalizeReminder([...currentDirect, ...nextResolved]);
@@ -304,6 +339,12 @@ export default function VoiceReminderScreen() {
     }
 
     // Start sequential resolution
+    // FIX: Also update refs when starting the queue
+    directTriggersRef.current = direct;
+    resolvedTriggersRef.current = [];
+    pendingQueueRef.current = pending;
+    queueIndexRef.current = 0;
+
     setDirectTriggers(direct);
     setResolvedTriggers([]);
     setPendingQueue(pending);
@@ -315,7 +356,7 @@ export default function VoiceReminderScreen() {
 
   const handleSelectSavedPlace = async (place: SavedPlace) => {
     setShowSavedPlacesList(false);
-    const currentParsedTrigger = pendingQueue[queueIndex];
+    const currentParsedTrigger = pendingQueueRef.current[queueIndexRef.current];
     const resolvedTrigger = createTrigger(
       TriggerType.LOCATION_ENTER,
       {
@@ -327,7 +368,7 @@ export default function VoiceReminderScreen() {
       currentParsedTrigger?.activationDateTime
     );
     await incrementPlaceUsage(place.id);
-    advanceResolutionQueue(resolvedTrigger, resolvedTriggers, directTriggers, pendingQueue, queueIndex);
+    advanceResolutionQueue(resolvedTrigger);
   };
 
   const handleAddNewPlace = () => {
@@ -344,14 +385,14 @@ export default function VoiceReminderScreen() {
         location.radius
       );
       await addSavedPlace(newPlace);
-      const currentParsedTrigger = pendingQueue[queueIndex];
+      const currentParsedTrigger = pendingQueueRef.current[queueIndexRef.current];
       const resolvedTrigger = createTrigger(
         TriggerType.LOCATION_ENTER,
         { ...location },
         currentParsedTrigger?.activationDateTime
       );
       setShowMapPicker(false);
-      advanceResolutionQueue(resolvedTrigger, resolvedTriggers, directTriggers, pendingQueue, queueIndex);
+      advanceResolutionQueue(resolvedTrigger);
     } catch (err) {
       if (__DEV__) console.error('[VoiceReminder] Failed to save location:', err);
       Alert.alert('Error', 'Failed to save location. Please try again.');
@@ -414,11 +455,7 @@ export default function VoiceReminderScreen() {
   };
 
   const showAppPickerForVoice = async (parsedTrigger: ParsedTrigger) => {
-    // Capture queue state at call time to avoid stale closures in Alert.onPress
-    const capturedResolved = resolvedTriggers;
-    const capturedDirect = directTriggers;
-    const capturedQueue = pendingQueue;
-    const capturedIndex = queueIndex;
+    // FIX: No longer need to capture state - we use refs now which always have current values
 
     try {
       const result = await screenTime.showAppPicker();
@@ -452,14 +489,8 @@ export default function VoiceReminderScreen() {
           [
             {
               text: 'OK',
-              onPress: () =>
-                advanceResolutionQueue(
-                  resolvedTrigger,
-                  capturedResolved,
-                  capturedDirect,
-                  capturedQueue,
-                  capturedIndex
-                ),
+              // FIX: Use refs instead of captured values - no stale closures
+              onPress: () => advanceResolutionQueue(resolvedTrigger),
             },
           ]
         );

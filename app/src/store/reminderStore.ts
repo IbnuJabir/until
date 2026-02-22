@@ -76,7 +76,7 @@ interface ReminderStore {
   updateSystemState: (state: Partial<SystemState>) => void;
 
   // Payment actions
-  updateEntitlements: (entitlements: PaymentEntitlement) => void;
+  updateEntitlements: (entitlements: PaymentEntitlement) => Promise<void>;
 
   // Query helpers
   getActiveReminders: () => Reminder[];
@@ -732,20 +732,16 @@ export const useReminderStore = create<ReminderStore>((set, get) => ({
    * Check if user can add more reminders (free tier limit)
    */
   canAddMoreReminders: () => {
-    // TEMP: Disabled for testing - allow unlimited reminders
-    return true;
+    const { reminders, entitlements } = get();
 
-    // ORIGINAL CODE (commented out for testing):
-    // const { reminders, entitlements } = get();
-    //
-    // // Pro users have unlimited reminders
-    // if (entitlements.hasProAccess) {
-    //   return true;
-    // }
-    //
-    // // Free users limited to 3 active reminders
-    // const activeReminders = reminders.filter(isReminderActive);
-    // return activeReminders.length < 3;
+    // Pro users have unlimited reminders
+    if (entitlements.hasProAccess) {
+      return true;
+    }
+
+    // Free users limited to 3 active reminders
+    const activeReminders = reminders.filter(isReminderActive);
+    return activeReminders.length < 3;
   },
 
   /**
