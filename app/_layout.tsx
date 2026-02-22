@@ -26,8 +26,14 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const routerRef = useRef(router); // FIX: Use ref to avoid re-running effect on router change
   const { fireReminder } = useReminderStore();
   const coldStartHandledRef = useRef(false);
+
+  // FIX: Keep router ref updated without causing effect re-runs
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
   // Initialize native event listeners
   useNativeEvents();
@@ -131,6 +137,7 @@ export default function RootLayout() {
   }, []);
 
   // Handle "Mark as Done" notification action
+  // FIX: Remove router from dependency array and use ref to prevent duplicate listeners
   useEffect(() => {
     const actionSubscription = Notifications.addNotificationResponseReceivedListener(
       async (response) => {
@@ -157,7 +164,7 @@ export default function RootLayout() {
           }
 
           setTimeout(() => {
-            router.push(`/reminder-detail?id=${reminderId}` as any);
+            routerRef.current.push(`/reminder-detail?id=${reminderId}` as any);
           }, 100);
         }
       }
@@ -176,7 +183,7 @@ export default function RootLayout() {
             }
 
             setTimeout(() => {
-              router.push(`/reminder-detail?id=${reminderId}` as any);
+              routerRef.current.push(`/reminder-detail?id=${reminderId}` as any);
             }, 500);
           }
         }
@@ -186,7 +193,7 @@ export default function RootLayout() {
     return () => {
       actionSubscription.remove();
     };
-  }, [router]);
+  }, []); // FIX: Empty dependency array - use routerRef instead of router
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

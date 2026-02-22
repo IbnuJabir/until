@@ -12,7 +12,7 @@ import {
   enableBatteryMonitoring,
   disableBatteryMonitoring,
 } from '../native-bridge/BatteryBridge';
-import { subscribeToRegionEntered } from '../native-bridge/LocationBridge';
+import { subscribeToRegionEntered, getMonitoredRegions } from '../native-bridge/LocationBridge';
 import { checkForAppOpenedEvents } from '../native-bridge/ScreenTimeBridge';
 import { SystemEventType, ReminderStatus, TriggerType, LocationConfig } from '../domain';
 
@@ -23,6 +23,7 @@ export function useNativeEvents() {
   const loadFromStorage = useReminderStore((state) => state.loadFromStorage);
   const lastProcessedEventRef = useRef<string | null>(null);
   const listenersSetupRef = useRef(false); // Track if listeners are already set up
+  const isMountedRef = useRef(true); // Track if component is still mounted
   const [dbLoaded, setDbLoaded] = useState(false); // Track if database load has completed
 
   // Load reminders from database on mount - MUST complete before event listeners start
@@ -40,18 +41,19 @@ export function useNativeEvents() {
   }, [loadFromStorage]);
 
   // Re-register geofences on app startup (iOS clears them on app restart)
+  // FIX: Check existing registrations before re-registering to avoid duplicates
   useEffect(() => {
     const registerStoredGeofences = async () => {
       // Wait for reminders to load
       if (reminders.length === 0) return;
 
       // Check if we have any location-based reminders before importing
-      const hasLocationReminders = reminders.some(r =>
+      const locationReminders = reminders.filter(r =>
         r.status === 'waiting' &&
         r.triggers.some(t => t.type === TriggerType.LOCATION_ENTER)
       );
 
-      if (!hasLocationReminders) {
+      if (locationReminders.length === 0) {
         if (__DEV__) console.log('[useNativeEvents] No active location-based reminders to register');
         return;
       }
@@ -65,20 +67,34 @@ export function useNativeEvents() {
 
         const { registerGeofence } = await import('../native-bridge/LocationBridge');
 
-        if (__DEV__) console.log('[useNativeEvents] Re-registering geofences for location-based reminders...');
+        // FIX: Get already monitored regions to avoid duplicate registration
+        const { regions: existingRegions } = await getMonitoredRegions();
+        const existingIdentifiers = new Set(existingRegions.map(r => r.identifier));
+
+        if (__DEV__) {
+          console.log('[useNativeEvents] Currently monitored regions:', existingIdentifiers.size);
+          console.log('[useNativeEvents] Re-registering geofences for location-based reminders...');
+        }
 
         let registeredCount = 0;
-        for (const reminder of reminders) {
-          // Only register for active reminders
-          if (reminder.status !== 'waiting') continue;
+        let skippedCount = 0;
 
+        for (const reminder of locationReminders) {
           for (const trigger of reminder.triggers) {
             if (trigger.type === TriggerType.LOCATION_ENTER && trigger.config) {
               const locationConfig = trigger.config as any;
+              const identifier = `reminder_${reminder.id}`;
+
+              // FIX: Skip if already registered
+              if (existingIdentifiers.has(identifier)) {
+                skippedCount++;
+                if (__DEV__) console.log(`[useNativeEvents] Skipped (already registered): ${reminder.title}`);
+                continue;
+              }
 
               try {
                 await registerGeofence(
-                  `reminder_${reminder.id}`,
+                  identifier,
                   locationConfig.latitude,
                   locationConfig.longitude,
                   locationConfig.radius
@@ -92,8 +108,8 @@ export function useNativeEvents() {
           }
         }
 
-        if (__DEV__ && registeredCount > 0) {
-          console.log(`[useNativeEvents] Successfully re-registered ${registeredCount} geofence(s)`);
+        if (__DEV__) {
+          console.log(`[useNativeEvents] Geofence registration complete: ${registeredCount} new, ${skippedCount} skipped (already registered)`);
         }
       } catch (error) {
         console.error('[useNativeEvents] Error during geofence registration:', error);
@@ -215,6 +231,12 @@ export function useNativeEvents() {
             console.log('=================================================');
           }
 
+          // FIX: Check if component is still mounted before processing
+          if (!isMountedRef.current) {
+            if (__DEV__) console.log('[useNativeEvents] ⏹️ Component unmounted, skipping event processing');
+            return;
+          }
+
           // Validate event has required fields
           if (!rawEvent.appId) {
             console.error('[useNativeEvents] ❌ ERROR: Event missing appId!');
@@ -273,6 +295,12 @@ export function useNativeEvents() {
             console.log('=================================================');
           }
 
+          // FIX: Final mount check before dispatching event
+          if (!isMountedRef.current) {
+            if (__DEV__) console.log('[useNativeEvents] ⏹️ Component unmounted before dispatch, skipping');
+            return;
+          }
+
           handleEvent(appOpenedEvent).catch((error) => {
             console.error('[useNativeEvents] ❌ Error handling app opened event:', error);
           });
@@ -286,6 +314,7 @@ export function useNativeEvents() {
     // Cleanup on unmount
     return () => {
       if (__DEV__) console.log('[useNativeEvents] Cleaning up native event listeners...');
+      isMountedRef.current = false; // FIX: Mark as unmounted to stop in-flight async operations
       clearInterval(pollInterval);
       unsubscribeAppLifecycle();
       unsubscribeCharging();

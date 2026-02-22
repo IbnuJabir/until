@@ -629,6 +629,17 @@ export default function CreateReminderScreen() {
       // Save to store (which persists to database)
       await addReminder(reminder);
 
+      // FIX: Track analytics for reminder creation (Issue #7 - Bug #9)
+      try {
+        const { Analytics } = await import('@/app/src/utils/Analytics');
+        for (const trigger of triggers) {
+          Analytics.reminderCreated(trigger.type);
+        }
+      } catch (analyticsError) {
+        // Non-critical - don't fail reminder creation if analytics fails
+        if (__DEV__) console.warn('[CreateReminder] Analytics tracking failed:', analyticsError);
+      }
+
       // Start global app monitoring if APP_OPENED triggers exist
       if (selectedTriggers.includes(TriggerType.APP_OPENED)) {
         if (__DEV__) {
